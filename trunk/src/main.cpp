@@ -28,398 +28,16 @@
 using namespace cv;
 using namespace std;
 
-IplImage* Rgb2Gray(IplImage *src) {
-	IplImage *result;
-	int i, j;
-
-	int step_src, step_res;
-
-	result = cvCreateImage(cvSize(src->width, src->height), src->depth, 1);
-
-	unsigned char *src_data;
-	unsigned char *res_data;
-
-	src_data = (unsigned char*) src->imageData;
-	res_data = (unsigned char*) result->imageData;
-
-	step_src = src->widthStep;
-	step_res = result->widthStep;
-
-	for (i = 0; i < src->height; i = i + 1) {
-		for (j = 0; j < (src->width * src->nChannels); j = j + src->nChannels) {
-			res_data[j / src->nChannels] = (unsigned char) ((0.3
-					* (double) src_data[j + 2])
-					+ (0.59 * (double) src_data[j + 1])
-					+ (0.11 * (double) src_data[j]));
-			//res_data[j+2]=src_data[j+2]; BGR format gray
-		}
-		src_data += step_src;
-		res_data += step_res;
-	}
-
-	return result;
-}
-
-CvMat* IplImage2Mat(IplImage *inp_img) {
-
-	CvMat *result;
-	IplImage *temp;
-	int i, j;
-	unsigned char tmp_char;
-	temp = Rgb2Gray(inp_img);
-	result = cvCreateMat(temp->height, temp->width, CV_64FC1);
-
-	for (i = 0; i < temp->height; i++) {
-		for (j = 0; j < temp->width; j++) {
-			tmp_char =
-					(unsigned char) temp->imageData[(i * temp->widthStep) + j];
-			cvmSet(result, i, j, (double) tmp_char);
-		}
-	}
-
-	cvReleaseImage(&temp);
-	return result;
-}
-
-IplImage* Mat2IplImage(CvMat *inp_mat, int type) {
-
-	IplImage *result;
-	int i, j;
-	double tmp_val;
-
-	if (type == 0) {
-		result = cvCreateImage(cvSize(inp_mat->cols, inp_mat->rows),
-				IPL_DEPTH_8U, 1);
-	} else if (type == 1) {
-		result = cvCreateImage(cvSize(inp_mat->cols, inp_mat->rows),
-				IPL_DEPTH_32F, 1);
-	} else {
-		return 0;
-	}
-
-	for (i = 0; i < result->height; i++) {
-		for (j = 0; j < result->width; j++) {
-			tmp_val = cvmGet(inp_mat, i, j);
-			result->imageData[(i * result->widthStep) + j] =
-					(unsigned char) tmp_val;
-		}
-	}
-
-	return result;
-}
-
-int Scale_Mat(CvMat *input, double scale) {
-	double tmp;
-	double val;
-	double min;
-	double max;
-	min = 20000.0;
-	max = -20000.0;
-	int i, j;
-	for (i = 0; i < input->rows; i++) {
-		for (j = 0; j < input->cols; j++) {
-			tmp = cvmGet(input, i, j);
-			//if(tmp==-INF)
-			//      printf("%d--%d\n",i,j);
-			if (tmp < min)
-				min = tmp;
-			if (tmp > max)
-				max = tmp;
-		}
-	}
-
-	//printf("%g - %g\n",min,max);
-
-	for (i = 0; i < input->rows; i++) {
-		for (j = 0; j < input->cols; j++) {
-			tmp = cvmGet(input, i, j);
-			val = scale * ((tmp - min) / (max - min));
-			//      printf("%g * ",val);
-			cvmSet(input, i, j, val);
-		}
-	}
-
-	/*max=0.0;
-	 for(i=0;i<input->rows;i++)
-	 {
-	 for(j=0;j<input->cols;j++)
-	 {
-	 tmp=cvmGet(input,i,j);
-	 if(max<tmp)
-	 max=tmp;
-	 }
-	 }
-
-	 printf("max =%g\n",max);
-	 */
-	return 1;
-}
-
-CvMat* Weighted_Gaussian(CvMat *inp, CvMat *gaussian) {
-	double sum;
-	double threshold;
-	int i, j;
-	double tmp1, tmp2;
-	double scl_factor;
-	double lt_cnt;
-	double gt_cnt;
-	bool mr_t_thr;
-
-	CvMat* w_gauss = cvCreateMat(gaussian->rows, gaussian->cols, CV_64FC1);
-	cvSetZero(w_gauss);
-	sum = 0.0;
-	for (i = 0; i < inp->rows; i++) {
-		for (j = 0; j < inp->cols; j++) {
-			sum = sum + cvmGet(inp, i, j);
-		}
-	}
-
-	threshold = sum / (inp->cols * inp->rows);
-	lt_cnt = 0;
-	gt_cnt = 0;
-	for (i = 0; i < inp->rows; i++) {
-		for (j = 0; j < inp->cols; j++) {
-			tmp1 = cvmGet(inp, i, j);
-			if (tmp1 > threshold) {
-				gt_cnt = gt_cnt + 1;
-			} else {
-				lt_cnt = lt_cnt + 1;
-			}
-		}
-	}
-
-	if (gt_cnt > lt_cnt) {
-		mr_t_thr = true;
-	} else {
-		mr_t_thr = false;
-	}
-
-	scl_factor = 0.0;
-	for (i = 0; i < inp->rows; i++) {
-		for (j = 0; j < inp->cols; j++) {
-			tmp1 = cvmGet(inp, i, j);
-			if (((tmp1 > threshold) && mr_t_thr == false)
-					|| ((tmp1 < threshold) && mr_t_thr == true)) {
-
-				cvmSet(w_gauss, i, j, 0.0);
-			} else {
-				tmp2 = cvmGet(gaussian, i, j);
-				scl_factor = scl_factor + tmp2;
-				cvmSet(w_gauss, i, j, tmp2);
-			}
-		}
-	}
-
-	/*Normalizing the weighted gaussian matrix*/
-
-	for (i = 0; i < inp->rows; i++) {
-		for (j = 0; j < inp->cols; j++) {
-			tmp1 = cvmGet(w_gauss, i, j);
-			tmp2 = tmp1 / scl_factor;
-			cvmSet(w_gauss, i, j, tmp2);
-		}
-	}
-
-	return w_gauss;
-}
-
-CvMat* Get_Mat(CvPoint a, int width, int height, IplImage *image) {
-
-	CvMat *fea_ar;
-
-	unsigned char t_val;
-	int h_i, w_i;
-
-	fea_ar = cvCreateMat(height, width, CV_64FC1);
-
-	cvSetZero(fea_ar);
-
-	int i, j;
-
-	for (i = a.y; i < (a.y + height); i++) {
-		for (j = a.x; j < (a.x + width); j++) {
-			if ((i >= 0) && (j >= 0) && (i < (image->height))
-					&& (j < (image->width))) {
-				t_val = (unsigned char) image->imageData[(i * image->widthStep)
-						+ j];
-				cvmSet(fea_ar, i - a.y, j - a.x, (double) t_val);
-			} else {
-				if (j < 0) {
-					w_i = image->width + j;
-				} else if (j >= image->width) {
-					w_i = j - image->width;
-				} else {
-					w_i = j;
-				}
-
-				if (i < 0) {
-					h_i = -i;
-				} else if (i >= image->height) {
-					h_i = image->height - (i - image->height);
-				} else {
-					h_i = i;
-				}
-
-				t_val =
-						(unsigned char) image->imageData[(h_i * image->widthStep)
-								+ w_i];
-				cvmSet(fea_ar, i - a.y, j - a.x, (double) t_val);
-			}
-		}
-
-	}
-
-	return (fea_ar);
-}
-
-/**
- *
- */
-CvMat* Conv_Weighted_Gaussian(IplImage *inp_img, CvMat *kernel) {
-	//IplImage *result;
-	int i, j;
-	CvPoint start;
-	CvMat *tmp;
-	CvMat *ddd;
-	CvMat *w_gauss;
-	//result=cvCloneImage(inp_img);
-
-	double val;
-	ddd = cvCreateMat(inp_img->height, inp_img->width, CV_64FC1);
-
-	for (i = 0; i < inp_img->height; i++) {
-		for (j = 0; j < inp_img->width; j++) {
-			start.x = j - (kernel->cols / 2);
-			start.y = i - (kernel->rows / 2);
-
-			tmp = Get_Mat(start, kernel->cols, kernel->rows, inp_img);
-
-			w_gauss = Weighted_Gaussian(tmp, kernel);
-
-			val = cvDotProduct(w_gauss, tmp);
-
-			cvmSet(ddd, i, j, val);
-
-			cvReleaseMat(&tmp);
-			cvReleaseMat(&w_gauss);
-
-		}
-	}
-
-	/*
-	 cvNamedWindow("fdf",1);
-	 cvShowImage("fdf",ddd);
-	 cvWaitKey(0);
-	 */
-
-	return ddd;
-
-}
-
-CvMat* Gaussian(int size) {
-	CvMat *res;
-	int i, j;
-	int x, y;
-	double tmp;
-	double sigma;
-	int halfsize;
-
-	sigma = (double) size / 5;
-	res = cvCreateMat(size, size, CV_64FC1);
-	halfsize = size / 2;
-
-	for (i = 0; i < res->rows; i++) {
-		for (j = 0; j < res->cols; j++) {
-			x = j - halfsize;
-			y = i - halfsize;
-			tmp = exp(-(double) (x * x + y * y) / sigma);
-			cvmSet(res, i, j, tmp);
-		}
-	}
-
-	return res;
-}
-
-IplImage* SQI(IplImage* inp) {
-	int num_filters;
-	int size[3];
-	IplImage *ttt;
-	CvMat *filtered_image[3];
-	CvMat *qi[3];
-	CvMat *inp_mat;
-	CvMat *res;
-	IplImage *res_img;
-	int i, j, k;
-	double tmp1, tmp2, tmp3;
-	CvMat *g_ker;
-
-	num_filters = 3;
-
-	size[0] = 3;
-	size[1] = 9;
-	size[2] = 15;
-
-	inp_mat = IplImage2Mat(inp);
-
-	// cvNamedWindow("ttt",1);
-
-	//cvShowImage("ttt",inp);
-	//cvWaitKey(0);
-
-	for (i = 0; i < num_filters; i++) {
-		g_ker = Gaussian(size[i]);
-		filtered_image[i] = Conv_Weighted_Gaussian(inp, g_ker);
-
-		/*  ttt=Mat2IplImage(filtered_image[i],0);
-		 cvShowImage("ttt",ttt);
-		 cvWaitKey(0);
-		 cvReleaseImage(&ttt);
-		 */
-		cvReleaseMat(&g_ker);
-		qi[i] = cvCreateMat(inp_mat->rows, inp_mat->cols, CV_64FC1);
-		for (j = 0; j < inp_mat->rows; j++) {
-			for (k = 0; k < inp_mat->cols; k++) {
-				tmp1 = cvmGet(inp_mat, j, k);
-				tmp2 = cvmGet(filtered_image[i], j, k);
-
-				//  if(tmp1==0.0 || tmp2==0.0 )
-				//{
-				//  tmp3=0.0;
-				//}
-				// else{
-				tmp3 = log10((tmp1 + 1.0) / (tmp2 + 1.0));
-				//}
-				// printf("%g *",tmp3);
-				cvmSet(qi[i], j, k, tmp3);
-
-			}
-		}
-		cvReleaseMat(&filtered_image[i]);
-	}
-
-	res = cvCreateMat(inp_mat->rows, inp_mat->cols, CV_64FC1);
-	cvSetZero(res);
-	for (i = 0; i < num_filters; i++) {
-		for (j = 0; j < inp_mat->rows; j++) {
-			for (k = 0; k < inp_mat->cols; k++) {
-				tmp1 = cvmGet(qi[i], j, k);
-				tmp2 = cvmGet(res, j, k);
-#ifdef DEBUG
-				//       printf("%g * ",tmp1+tmp2);
-#endif
-				cvmSet(res, j, k, tmp1 + tmp2);
-			}
-		}
-		cvReleaseMat(&qi[i]);
-	}
-
-	Scale_Mat(res, 255);
-	res_img = Mat2IplImage(res, 0);
-
-	cvReleaseMat(&res);
-
-	return res_img;
-}
+//libface lib functions
+IplImage* Rgb2Gray(IplImage *src);
+CvMat* IplImage2Mat(IplImage *inp_img);
+IplImage* Mat2IplImage(CvMat *inp_mat, int type);
+int Scale_Mat(CvMat *input, double scale);
+CvMat* Weighted_Gaussian(CvMat *inp, CvMat *gaussian);
+CvMat* Get_Mat(CvPoint a, int width, int height, IplImage *image);
+CvMat* Conv_Weighted_Gaussian(IplImage *inp_img, CvMat *kernel);
+CvMat* Gaussian(int size);
+IplImage* SQI(IplImage* inp);
 
 // http://stackoverflow.com/questions/2289690/opencv-how-to-rotate-iplimage
 Mat rotateImage(const Mat& source, double angle) {
@@ -429,35 +47,6 @@ Mat rotateImage(const Mat& source, double angle) {
 	warpAffine(source, dst, rot_mat, source.size());
 
 	return dst;
-}
-
-IplImage* rotateImage(const IplImage* src, int angleDegrees) {
-	//take the dimention of original image
-	int w = src->width;
-	int h = src->height;
-
-	// Make a new image for the result
-	CvSize newSize;
-	newSize.width = cvRound(w);
-	newSize.height = cvRound(h);
-	IplImage *imageRotated = cvCreateImage(newSize, src->depth, src->nChannels);
-
-	// Create a map_matrix, where the left 2x2 matrix is the transform and the right 2x1 is the dimensions.
-	float m[6];
-	CvMat M = cvMat(2, 3, CV_32F, m);
-
-	float angleRadians = angleDegrees * ((float) CV_PI / 180.0f);
-	m[0] = (float) (cos(angleRadians));
-	m[1] = (float) (sin(angleRadians));
-	m[3] = -m[1];
-	m[4] = m[0];
-	m[2] = w * 0.5f;
-	m[5] = h * 0.5f;
-
-	// Transform the image
-	cvGetQuadrangleSubPix(src, imageRotated, &M);
-
-	return imageRotated;
 }
 
 /**
@@ -627,7 +216,7 @@ int main() {
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	static const char* path = "scarlett_johansson_face.jpg";
+	static const char* path = "2013-11-08-223043.jpg";
 
 	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
@@ -913,14 +502,11 @@ int main() {
 		//cv::imshow("rotatedImg", poseNormImg);
 
 		// 4.(b) horizontal flip if dr smaller than dl
-		if (gsl_fcmp(dl, dr, DBL_EPSILON) == 1) // x = y returns 0; if x < y returns -1; x > y returns +1;
-			flip(poseNormImg, poseNormImg, 1);
-		else
-			// do nothing
-			//flip(rotatedImg,rotatedImg,1); // http://www.technolabsz.com/2012/08/how-to-flip-image-in-opencv.html
+		if (gsl_fcmp(dl, dr, DBL_EPSILON) == 1) {
+			flip(poseNormImg, poseNormImg, 1); // x = y returns 0; if x < y returns -1; x > y returns +1;
+		}
 
-			//cv::imshow("flippedImg", poseNormImg);
-			imwrite("poseNormImg.jpg", poseNormImg);
+		imwrite("poseNormImg.jpg", poseNormImg);
 
 		// 4. (c) stretching
 
@@ -949,7 +535,7 @@ int main() {
 		line(poseNormImg, bottomRight, topRight, 255, 1, 8, 0);
 		line(poseNormImg, topRight, topCenter, 255, 1, 8, 0);
 
-		imshow("poseNormImg", poseNormImg);
+		imshow("angle correction", poseNormImg);
 
 		cv::Mat out(poseNormImg.rows, poseNormImg.cols, CV_8U);
 		cv::Mat out2(poseNormImg.rows, poseNormImg.cols, CV_8U);
@@ -992,7 +578,7 @@ int main() {
 			}
 		}
 
-		imshow("stretched", out);
+		imshow("rows stretched equally", out);
 
 		for (int row = 0; row < poseNormImg.rows; row++) {
 			for (int col = 0; col < poseNormImg.cols; col++) {
@@ -1003,17 +589,16 @@ int main() {
 			}
 		}
 
-		imshow("mirror", out2);
+		imshow("Mirror right to left", out2);
 
 		// 4.(f)
 		Mat illumNorn;
 
 		IplImage copy = out2;
-		IplImage* new_image = &copy;
 
-		illumNorn = Mat(SQI(new_image));
+		illumNorn = Mat(SQI(&copy));
 
-		imshow("illumNorn", illumNorn);
+		imshow("illumination norm with SQI", illumNorn);
 
 		nfaces++;
 	}
@@ -1025,4 +610,397 @@ int main() {
 	cv::waitKey(0);
 
 	return 0;
+}
+
+IplImage* Rgb2Gray(IplImage *src) {
+	IplImage *result;
+	int i, j;
+
+	int step_src, step_res;
+
+	result = cvCreateImage(cvSize(src->width, src->height), src->depth, 1);
+
+	unsigned char *src_data;
+	unsigned char *res_data;
+
+	src_data = (unsigned char*) src->imageData;
+	res_data = (unsigned char*) result->imageData;
+
+	step_src = src->widthStep;
+	step_res = result->widthStep;
+
+	for (i = 0; i < src->height; i = i + 1) {
+		for (j = 0; j < (src->width * src->nChannels); j = j + src->nChannels) {
+			res_data[j / src->nChannels] = (unsigned char) ((0.3
+					* (double) src_data[j + 2])
+					+ (0.59 * (double) src_data[j + 1])
+					+ (0.11 * (double) src_data[j]));
+			//res_data[j+2]=src_data[j+2]; BGR format gray
+		}
+		src_data += step_src;
+		res_data += step_res;
+	}
+
+	return result;
+}
+
+CvMat* IplImage2Mat(IplImage *inp_img) {
+
+	CvMat *result;
+	IplImage *temp;
+	int i, j;
+	unsigned char tmp_char;
+	temp = Rgb2Gray(inp_img);
+	result = cvCreateMat(temp->height, temp->width, CV_64FC1);
+
+	for (i = 0; i < temp->height; i++) {
+		for (j = 0; j < temp->width; j++) {
+			tmp_char =
+					(unsigned char) temp->imageData[(i * temp->widthStep) + j];
+			cvmSet(result, i, j, (double) tmp_char);
+		}
+	}
+
+	cvReleaseImage(&temp);
+	return result;
+}
+
+IplImage* Mat2IplImage(CvMat *inp_mat, int type) {
+
+	IplImage *result;
+	int i, j;
+	double tmp_val;
+
+	if (type == 0) {
+		result = cvCreateImage(cvSize(inp_mat->cols, inp_mat->rows),
+				IPL_DEPTH_8U, 1);
+	} else if (type == 1) {
+		result = cvCreateImage(cvSize(inp_mat->cols, inp_mat->rows),
+				IPL_DEPTH_32F, 1);
+	} else {
+		return 0;
+	}
+
+	for (i = 0; i < result->height; i++) {
+		for (j = 0; j < result->width; j++) {
+			tmp_val = cvmGet(inp_mat, i, j);
+			result->imageData[(i * result->widthStep) + j] =
+					(unsigned char) tmp_val;
+		}
+	}
+
+	return result;
+}
+
+int Scale_Mat(CvMat *input, double scale) {
+	double tmp;
+	double val;
+	double min;
+	double max;
+	min = 20000.0;
+	max = -20000.0;
+	int i, j;
+	for (i = 0; i < input->rows; i++) {
+		for (j = 0; j < input->cols; j++) {
+			tmp = cvmGet(input, i, j);
+			//if(tmp==-INF)
+			//      printf("%d--%d\n",i,j);
+			if (tmp < min)
+				min = tmp;
+			if (tmp > max)
+				max = tmp;
+		}
+	}
+
+//printf("%g - %g\n",min,max);
+
+	for (i = 0; i < input->rows; i++) {
+		for (j = 0; j < input->cols; j++) {
+			tmp = cvmGet(input, i, j);
+			val = scale * ((tmp - min) / (max - min));
+			//      printf("%g * ",val);
+			cvmSet(input, i, j, val);
+		}
+	}
+
+	/*max=0.0;
+	 for(i=0;i<input->rows;i++)
+	 {
+	 for(j=0;j<input->cols;j++)
+	 {
+	 tmp=cvmGet(input,i,j);
+	 if(max<tmp)
+	 max=tmp;
+	 }
+	 }
+
+	 printf("max =%g\n",max);
+	 */
+	return 1;
+}
+
+CvMat* Weighted_Gaussian(CvMat *inp, CvMat *gaussian) {
+	double sum;
+	double threshold;
+	int i, j;
+	double tmp1, tmp2;
+	double scl_factor;
+	double lt_cnt;
+	double gt_cnt;
+	bool mr_t_thr;
+
+	CvMat* w_gauss = cvCreateMat(gaussian->rows, gaussian->cols, CV_64FC1);
+	cvSetZero(w_gauss);
+	sum = 0.0;
+	for (i = 0; i < inp->rows; i++) {
+		for (j = 0; j < inp->cols; j++) {
+			sum = sum + cvmGet(inp, i, j);
+		}
+	}
+
+	threshold = sum / (inp->cols * inp->rows);
+	lt_cnt = 0;
+	gt_cnt = 0;
+	for (i = 0; i < inp->rows; i++) {
+		for (j = 0; j < inp->cols; j++) {
+			tmp1 = cvmGet(inp, i, j);
+			if (tmp1 > threshold) {
+				gt_cnt = gt_cnt + 1;
+			} else {
+				lt_cnt = lt_cnt + 1;
+			}
+		}
+	}
+
+	if (gt_cnt > lt_cnt) {
+		mr_t_thr = true;
+	} else {
+		mr_t_thr = false;
+	}
+
+	scl_factor = 0.0;
+	for (i = 0; i < inp->rows; i++) {
+		for (j = 0; j < inp->cols; j++) {
+			tmp1 = cvmGet(inp, i, j);
+			if (((tmp1 > threshold) && mr_t_thr == false)
+					|| ((tmp1 < threshold) && mr_t_thr == true)) {
+
+				cvmSet(w_gauss, i, j, 0.0);
+			} else {
+				tmp2 = cvmGet(gaussian, i, j);
+				scl_factor = scl_factor + tmp2;
+				cvmSet(w_gauss, i, j, tmp2);
+			}
+		}
+	}
+
+	/*Normalizing the weighted gaussian matrix*/
+
+	for (i = 0; i < inp->rows; i++) {
+		for (j = 0; j < inp->cols; j++) {
+			tmp1 = cvmGet(w_gauss, i, j);
+			tmp2 = tmp1 / scl_factor;
+			cvmSet(w_gauss, i, j, tmp2);
+		}
+	}
+
+	return w_gauss;
+}
+
+CvMat* Get_Mat(CvPoint a, int width, int height, IplImage *image) {
+
+	CvMat *fea_ar;
+
+	unsigned char t_val;
+	int h_i, w_i;
+
+	fea_ar = cvCreateMat(height, width, CV_64FC1);
+
+	cvSetZero(fea_ar);
+
+	int i, j;
+
+	for (i = a.y; i < (a.y + height); i++) {
+		for (j = a.x; j < (a.x + width); j++) {
+			if ((i >= 0) && (j >= 0) && (i < (image->height))
+					&& (j < (image->width))) {
+				t_val = (unsigned char) image->imageData[(i * image->widthStep)
+						+ j];
+				cvmSet(fea_ar, i - a.y, j - a.x, (double) t_val);
+			} else {
+				if (j < 0) {
+					w_i = image->width + j;
+				} else if (j >= image->width) {
+					w_i = j - image->width;
+				} else {
+					w_i = j;
+				}
+
+				if (i < 0) {
+					h_i = -i;
+				} else if (i >= image->height) {
+					h_i = image->height - (i - image->height);
+				} else {
+					h_i = i;
+				}
+
+				t_val =
+						(unsigned char) image->imageData[(h_i * image->widthStep)
+								+ w_i];
+				cvmSet(fea_ar, i - a.y, j - a.x, (double) t_val);
+			}
+		}
+
+	}
+
+	return (fea_ar);
+}
+
+/**
+ *
+ */
+CvMat* Conv_Weighted_Gaussian(IplImage *inp_img, CvMat *kernel) {
+//IplImage *result;
+	int i, j;
+	CvPoint start;
+	CvMat *tmp;
+	CvMat *ddd;
+	CvMat *w_gauss;
+//result=cvCloneImage(inp_img);
+
+	double val;
+	ddd = cvCreateMat(inp_img->height, inp_img->width, CV_64FC1);
+
+	for (i = 0; i < inp_img->height; i++) {
+		for (j = 0; j < inp_img->width; j++) {
+			start.x = j - (kernel->cols / 2);
+			start.y = i - (kernel->rows / 2);
+
+			tmp = Get_Mat(start, kernel->cols, kernel->rows, inp_img);
+
+			w_gauss = Weighted_Gaussian(tmp, kernel);
+
+			val = cvDotProduct(w_gauss, tmp);
+
+			cvmSet(ddd, i, j, val);
+
+			cvReleaseMat(&tmp);
+			cvReleaseMat(&w_gauss);
+
+		}
+	}
+
+	/*
+	 cvNamedWindow("fdf",1);
+	 cvShowImage("fdf",ddd);
+	 cvWaitKey(0);
+	 */
+
+	return ddd;
+
+}
+
+CvMat* Gaussian(int size) {
+	CvMat *res;
+	int i, j;
+	int x, y;
+	double tmp;
+	double sigma;
+	int halfsize;
+
+	sigma = (double) size / 5;
+	res = cvCreateMat(size, size, CV_64FC1);
+	halfsize = size / 2;
+
+	for (i = 0; i < res->rows; i++) {
+		for (j = 0; j < res->cols; j++) {
+			x = j - halfsize;
+			y = i - halfsize;
+			tmp = exp(-(double) (x * x + y * y) / sigma);
+			cvmSet(res, i, j, tmp);
+		}
+	}
+
+	return res;
+}
+
+IplImage* SQI(IplImage* inp) {
+	int num_filters;
+	int size[3];
+	IplImage *ttt;
+	CvMat *filtered_image[3];
+	CvMat *qi[3];
+	CvMat *inp_mat;
+	CvMat *res;
+	IplImage *res_img;
+	int i, j, k;
+	double tmp1, tmp2, tmp3;
+	CvMat *g_ker;
+
+	num_filters = 3;
+
+	size[0] = 3;
+	size[1] = 9;
+	size[2] = 15;
+
+	inp_mat = IplImage2Mat(inp);
+
+// cvNamedWindow("ttt",1);
+
+//cvShowImage("ttt",inp);
+//cvWaitKey(0);
+
+	for (i = 0; i < num_filters; i++) {
+		g_ker = Gaussian(size[i]);
+		filtered_image[i] = Conv_Weighted_Gaussian(inp, g_ker);
+
+		/*  ttt=Mat2IplImage(filtered_image[i],0);
+		 cvShowImage("ttt",ttt);
+		 cvWaitKey(0);
+		 cvReleaseImage(&ttt);
+		 */
+		cvReleaseMat(&g_ker);
+		qi[i] = cvCreateMat(inp_mat->rows, inp_mat->cols, CV_64FC1);
+		for (j = 0; j < inp_mat->rows; j++) {
+			for (k = 0; k < inp_mat->cols; k++) {
+				tmp1 = cvmGet(inp_mat, j, k);
+				tmp2 = cvmGet(filtered_image[i], j, k);
+
+				//  if(tmp1==0.0 || tmp2==0.0 )
+				//{
+				//  tmp3=0.0;
+				//}
+				// else{
+				tmp3 = log10((tmp1 + 1.0) / (tmp2 + 1.0));
+				//}
+				// printf("%g *",tmp3);
+				cvmSet(qi[i], j, k, tmp3);
+
+			}
+		}
+		cvReleaseMat(&filtered_image[i]);
+	}
+
+	res = cvCreateMat(inp_mat->rows, inp_mat->cols, CV_64FC1);
+	cvSetZero(res);
+	for (i = 0; i < num_filters; i++) {
+		for (j = 0; j < inp_mat->rows; j++) {
+			for (k = 0; k < inp_mat->cols; k++) {
+				tmp1 = cvmGet(qi[i], j, k);
+				tmp2 = cvmGet(res, j, k);
+#ifdef DEBUG
+				//       printf("%g * ",tmp1+tmp2);
+#endif
+				cvmSet(res, j, k, tmp1 + tmp2);
+			}
+		}
+		cvReleaseMat(&qi[i]);
+	}
+
+	Scale_Mat(res, 255);
+	res_img = Mat2IplImage(res, 0);
+
+	cvReleaseMat(&res);
+
+	return res_img;
 }
