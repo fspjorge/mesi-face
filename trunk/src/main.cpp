@@ -216,7 +216,7 @@ int main() {
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	static const char* path = "2013-11-08-223043.jpg";
+	static const char* path = "scarlett_johansson_eyes_smile1.jpg";
 
 	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
@@ -259,6 +259,14 @@ int main() {
 				cvRound(landmarks[56 * 2 + 1]));
 		Point CTipOfChin = Point(cvRound(landmarks[6 * 2]),
 				cvRound(landmarks[6 * 2 + 1]));
+
+		Point CForehead = Point(cvRound(landmarks[14 * 2]),
+				cvRound(landmarks[14 * 2 + 1]));
+		Point LJawNoseline = Point(cvRound(landmarks[2 * 2]),
+						cvRound(landmarks[2 * 2 + 1]));
+		Point RJaw11 = Point(cvRound(landmarks[11 * 2]),
+						cvRound(landmarks[11 * 2 + 1]));
+
 
 		/*        // draw a line between the two eyes
 		 line(img, RPupil, LPupil, cvScalar(255,0,255), 1);
@@ -496,23 +504,39 @@ int main() {
 		// C. POSE NORMALIZATION ###########################################
 		Mat poseNormImg(img.rows, img.cols, CV_8UC1);
 
+		// Face cropping
+//		Point CForehead = Point(cvRound(landmarks[14 * 2]),
+//				cvRound(landmarks[14 * 2 + 1]));
+//		Point LJawNoseline = Point(cvRound(landmarks[2 * 2]),
+//						cvRound(landmarks[2 * 2 + 1]));
+//		Point RJaw11 = Point(cvRound(landmarks[11 * 2]),
+//						cvRound(landmarks[11 * 2 + 1]));
+
+		int width = RJaw11.x - LJawNoseline.x  + 10;
+		int height = CTipOfChin.y - CForehead.y;
+
+		//crop face
+		Mat roi = img( Rect(LJawNoseline.x - 5, CForehead.y, width, height) );
+
+		imshow("www", roi);
+
 		// 4.(a) rotation
 		double theta_deg = theta * 180 / CV_PI;
-		poseNormImg = rotateImage(img, -180 + theta_deg);
+		roi = rotateImage(roi, -180 + theta_deg);
 		//cv::imshow("rotatedImg", poseNormImg);
 
 		// 4.(b) horizontal flip if dr smaller than dl
 		if (gsl_fcmp(dl, dr, DBL_EPSILON) == 1) {
-			flip(poseNormImg, poseNormImg, 1); // x = y returns 0; if x < y returns -1; x > y returns +1;
+			flip(roi, roi, 1); // x = y returns 0; if x < y returns -1; x > y returns +1;
 		}
 
-		imwrite("poseNormImg.jpg", poseNormImg);
+		imwrite("roi.jpg", roi);
 
 		// 4. (c) stretching
 
-		std::vector<Point> stasmVector = getStasmArray("poseNormImg.jpg", 68);
+		std::vector<Point> stasmVector = getStasmArray("roi.jpg", 68);
 
-		Point topCenter = Point(poseNormImg.cols * 0.5, 0);
+		Point topCenter = Point(roi.cols * 0.5, 0);
 		Point noseTop = midpoint(stasmVector.at(24).x, stasmVector.at(24).y,
 				stasmVector.at(18).x, stasmVector.at(18).y);
 		Point noseTip = stasmVector.at(67);
@@ -520,47 +544,47 @@ int main() {
 		Point lipTop = stasmVector.at(51);
 		Point lipBottom = stasmVector.at(57);
 		Point chinTip = stasmVector.at(7);
-		Point bottomCenter = Point(poseNormImg.cols * 0.5, poseNormImg.rows);
-		Point bottomRight = Point(poseNormImg.cols, poseNormImg.rows);
-		Point topRight = Point(poseNormImg.cols, 0);
+		Point bottomCenter = Point(roi.cols * 0.5, roi.rows);
+		Point bottomRight = Point(roi.cols, roi.rows);
+		Point topRight = Point(roi.cols, 0);
 
-		line(poseNormImg, topCenter, noseTop, 255, 1, 8, 0);
-		line(poseNormImg, noseTop, noseTip, 255, 1, 8, 0);
-		line(poseNormImg, noseTip, noseBase, 255, 1, 8, 0);
-		line(poseNormImg, noseBase, lipTop, 255, 1, 8, 0);
-		line(poseNormImg, lipTop, lipBottom, 255, 1, 8, 0);
-		line(poseNormImg, lipBottom, chinTip, 255, 1, 8, 0);
-		line(poseNormImg, chinTip, bottomCenter, 255, 1, 8, 0);
-		line(poseNormImg, bottomCenter, bottomRight, 255, 1, 8, 0);
-		line(poseNormImg, bottomRight, topRight, 255, 1, 8, 0);
-		line(poseNormImg, topRight, topCenter, 255, 1, 8, 0);
+		line(roi, topCenter, noseTop, 255, 1, 8, 0);
+		line(roi, noseTop, noseTip, 255, 1, 8, 0);
+		line(roi, noseTip, noseBase, 255, 1, 8, 0);
+		line(roi, noseBase, lipTop, 255, 1, 8, 0);
+		line(roi, lipTop, lipBottom, 255, 1, 8, 0);
+		line(roi, lipBottom, chinTip, 255, 1, 8, 0);
+		line(roi, chinTip, bottomCenter, 255, 1, 8, 0);
+		line(roi, bottomCenter, bottomRight, 255, 1, 8, 0);
+		line(roi, bottomRight, topRight, 255, 1, 8, 0);
+		line(roi, topRight, topCenter, 255, 1, 8, 0);
 
-		imshow("angle correction", poseNormImg);
+		imshow("angle correction", roi);
 
-		cv::Mat out(poseNormImg.rows, poseNormImg.cols, CV_8U);
-		cv::Mat out2(poseNormImg.rows, poseNormImg.cols, CV_8U);
+		cv::Mat out(roi.rows, roi.cols, CV_8U);
+		cv::Mat out2(roi.rows, roi.cols, CV_8U);
 
-		Mat d1 = deskewing(poseNormImg, topCenter, noseTop,
-				Point(poseNormImg.cols, noseTop.y), topRight);
-		Mat d2 = deskewing(poseNormImg, noseTop, noseTip,
-				Point(poseNormImg.cols, noseTip.y),
-				Point(poseNormImg.cols, noseTop.y));
-		Mat d3 = deskewing(poseNormImg, noseTip, noseBase,
-				Point(poseNormImg.cols, noseBase.y),
-				Point(poseNormImg.cols, noseTip.y));
-		Mat d4 = deskewing(poseNormImg, noseBase, lipTop,
-				Point(poseNormImg.cols, lipTop.y),
-				Point(poseNormImg.cols, noseBase.y));
-		Mat d5 = deskewing(poseNormImg, lipTop, lipBottom,
-				Point(poseNormImg.cols, lipBottom.y),
-				Point(poseNormImg.cols, lipTop.y));
-		Mat d6 = deskewing(poseNormImg, lipBottom, chinTip,
-				Point(poseNormImg.cols, chinTip.y),
-				Point(poseNormImg.cols, lipBottom.y));
-		Mat d7 = deskewing(poseNormImg, chinTip, bottomCenter, bottomRight,
-				Point(poseNormImg.cols, chinTip.y));
+		Mat d1 = deskewing(roi, topCenter, noseTop,
+				Point(roi.cols, noseTop.y), topRight);
+		Mat d2 = deskewing(roi, noseTop, noseTip,
+				Point(roi.cols, noseTip.y),
+				Point(roi.cols, noseTop.y));
+		Mat d3 = deskewing(roi, noseTip, noseBase,
+				Point(roi.cols, noseBase.y),
+				Point(roi.cols, noseTip.y));
+		Mat d4 = deskewing(roi, noseBase, lipTop,
+				Point(roi.cols, lipTop.y),
+				Point(roi.cols, noseBase.y));
+		Mat d5 = deskewing(roi, lipTop, lipBottom,
+				Point(roi.cols, lipBottom.y),
+				Point(roi.cols, lipTop.y));
+		Mat d6 = deskewing(roi, lipBottom, chinTip,
+				Point(roi.cols, chinTip.y),
+				Point(roi.cols, lipBottom.y));
+		Mat d7 = deskewing(roi, chinTip, bottomCenter, bottomRight,
+				Point(roi.cols, chinTip.y));
 
-		for (int row = 0; row < poseNormImg.rows; row++) {
+		for (int row = 0; row < roi.rows; row++) {
 			if (row < noseTop.y) {
 				d1.row(row).copyTo(out.row(row));
 			} else if (row < noseTip.y) {
@@ -580,9 +604,9 @@ int main() {
 
 		imshow("rows stretched equally", out);
 
-		for (int row = 0; row < poseNormImg.rows; row++) {
-			for (int col = 0; col < poseNormImg.cols; col++) {
-				if (col < poseNormImg.cols * 0.5)
+		for (int row = 0; row < roi.rows; row++) {
+			for (int col = 0; col < roi.cols; col++) {
+				if (col < roi.cols * 0.5)
 					out2.at<uchar>(row, col) = out.at<uchar>(row, -col);
 				else
 					out2.at<uchar>(row, col) = out.at<uchar>(row, col);
@@ -594,11 +618,24 @@ int main() {
 		// 4.(f)
 		Mat illumNorn;
 
-		IplImage copy = out2;
+//		IplImage copy = out2;
+//
+//		illumNorn = Mat(SQI(&copy));
 
-		illumNorn = Mat(SQI(&copy));
-
-		imshow("illumination norm with SQI", illumNorn);
+//		Mat imageSQItest;
+//		imageSQItest = imread("Screenshot - 09-11-2013 - 16:20:17.png", CV_LOAD_IMAGE_GRAYSCALE);   // Read the file
+//
+//		if(! imageSQItest.data )                              // Check for invalid input
+//		{
+//			cout <<  "Could not open or find the image" << std::endl ;
+//			return -1;
+//		}
+//
+//		IplImage copy = imageSQItest;
+//
+//		illumNorn = Mat(SQI(&copy));
+//
+//		imshow("illumination norm with SQI", illumNorn);
 
 		nfaces++;
 	}
