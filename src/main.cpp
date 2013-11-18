@@ -56,6 +56,7 @@ int min_value(int a, int b) {
 int max_value(int a, int b) {
 	return ((a > b) ? (a) : (b));
 }
+
 /**
  * http://stackoverflow.com/questions/7838487/executing-cvwarpperspective-for-a-fake-deskewing-on-a-set-of-cvpoint
  * 1---------4
@@ -167,8 +168,8 @@ double get_mass_center(std::string const& name, Mat1b const& image) {
 	int mc = sum1 / sum2;
 
 	// show and save histograms
-    circle(hist_image,Point(mc, 255),5,cvScalar(255,0,0),-1,8);
-    cv::imwrite(std::string("histograms/") + name + ".png",hist_image); // save
+	circle(hist_image, Point(mc, 255), 5, cvScalar(255, 0, 0), -1, 8);
+	cv::imwrite(std::string("histograms/") + name + ".png", hist_image); // save
 //    cv::imshow(name, hist_image);
 
 	return mc;
@@ -207,8 +208,6 @@ vector<Point> get_stasm_pts(char* imgPath, int shape) {
 			1 /*multiface*/, 10 /*minwidth*/))
 		error("stasm_open_image failed: ", stasm_lasterr());
 
-
-
 	int foundface;
 	float landmarks[2 * stasm_NLANDMARKS]; // x,y coords (note the 2)
 
@@ -232,6 +231,18 @@ vector<Point> get_stasm_pts(char* imgPath, int shape) {
 	}
 	return pts_array;
 }
+
+
+/**
+ * recalculation of STASM points coordinates.
+ */
+vector<Point> get_new_stasm_pts(Mat src, int shape) {
+	imwrite("tmp.jpg", src);
+	char *tmp = new char[10];
+	strcpy( tmp, "tmp.jpg" );
+	return get_stasm_pts(tmp, shape); // ok até aqui
+}
+
 
 int main() {
 	if (!stasm_init("data", 0 /*trace*/))
@@ -401,7 +412,6 @@ int main() {
 						p8.y - (cvRound(length * 0.1) * 0.5),
 						cvRound(length * 0.1), cvRound(length * 0.1)));
 
-
 		cv::imwrite("histograms/w1.png", subMatPt1); // save
 		cv::imwrite("histograms/w2.png", subMatPt2); // save
 		cv::imwrite("histograms/w3.png", subMatPt3); // save
@@ -474,8 +484,7 @@ int main() {
 //		cv::waitKey(0);
 
 		// imagem rodada theta graus, nova verificação das coordenadas dos pontos devido à rotação
-		imwrite("tmp.jpg", img);
-		std::vector<Point> roi_vector = get_stasm_pts("tmp.jpg", 68); // ok até aqui
+		std::vector<Point> roi_vector = get_new_stasm_pts(img, 68); // ok até aqui
 
 		int x1 = roi_vector.at(1).x - 5;
 		int y1 = roi_vector.at(23).y - 40;
@@ -489,12 +498,10 @@ int main() {
 
 		Mat crop = img(Rect(x1, y1, width, height));
 
-		imwrite("tmp.jpg", crop);
 		imshow("crop", crop);
 
 		// 4. (c) stretching
-		std::vector<Point> stasm_vector = get_stasm_pts("tmp.jpg", 68);
-
+		std::vector<Point> stasm_vector = get_new_stasm_pts(crop, 68);
 
 		Point noseTop = midpoint(stasm_vector.at(24).x, stasm_vector.at(24).y,
 				stasm_vector.at(18).x, stasm_vector.at(18).y);
@@ -508,8 +515,8 @@ int main() {
 		Point bottomRight = Point(crop.cols, crop.rows);
 		Point topRight = Point(crop.cols, 0);
 
-		int thickness = -1;
-		int lineType = 8;
+//		int thickness = -1;
+//		int lineType = 8;
 
 //		circle(crop, topCenter, 2, Scalar(0, 255, 255), thickness, lineType);
 //		circle(crop, noseTop, 2, Scalar(0, 0, 255), thickness, lineType);
@@ -589,8 +596,7 @@ int main() {
 			}
 		}
 
-		imwrite("tmp.jpg", out2);
-		std::vector<Point> stasm_vector2 = get_stasm_pts("tmp.jpg", 68);
+		std::vector<Point> stasm_vector2 = get_new_stasm_pts(out2, 68);
 
 //		circle(out2, midpoint(stasm_vector2.at(24).x, stasm_vector2.at(24).y, stasm_vector2.at(18).x, stasm_vector2.at(18).y), 2, Scalar(0, 255, 255), thickness, lineType);
 //		circle(out2, stasm_vector2.at(67), 2, Scalar(0, 0, 255), thickness, lineType);
@@ -606,14 +612,14 @@ int main() {
 //		circle(out2, stasm_vector2.at(13), 2, Scalar(0, 0, 255), thickness, lineType);
 //		circle(out2, stasm_vector2.at(16), 2, Scalar(0, 255, 255), thickness, lineType);
 
-		imshow("Mirror right to left", out2);
+//		imshow("Mirror right to left", out2);
 
 		// 4.(f) função sqi
 		Mat illumNorn;
 
-		IplImage copy = out2;
+//		IplImage copy = out2;
 
-		illumNorn = Mat(SQI(&copy));
+//		illumNorn = Mat(SQI(&copy));
 
 		/*Mat imageSQItest;
 		 imageSQItest = imread("Screenshot - 09-11-2013 - 16:20:17.png", CV_LOAD_IMAGE_GRAYSCALE);   // Read the file
@@ -628,7 +634,7 @@ int main() {
 
 		 illumNorn = Mat(SQI(&copy));*/
 
-		imshow("illumination norm with SQI", illumNorn);
+//		imshow("illumination norm with SQI", illumNorn);
 		nfaces++;
 	}
 
@@ -956,7 +962,7 @@ CvMat* Gaussian(int size) {
 IplImage* SQI(IplImage* inp) {
 	int num_filters;
 	int size[3];
-	IplImage *ttt;
+//	IplImage *ttt;
 	CvMat *filtered_image[3];
 	CvMat *qi[3];
 	CvMat *inp_mat;
