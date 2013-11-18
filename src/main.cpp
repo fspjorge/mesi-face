@@ -49,37 +49,49 @@ Mat rotateImage(const Mat& source, double angle) {
 	return dst;
 }
 
+int min_value(int a, int b) {
+	return ((a < b) ? (a) : (b));
+}
+
+int max_value(int a, int b) {
+	return ((a > b) ? (a) : (b));
+}
 /**
  * http://stackoverflow.com/questions/7838487/executing-cvwarpperspective-for-a-fake-deskewing-on-a-set-of-cvpoint
+ * 1---------4
+ * |         |
+ * |         |
+ * |         |
+ * 2---------3
  */
-Mat deskewing(Mat src, Point pt1, Point pt2, Point pt3, Point pt4) {
+Mat correct_perpective(Mat src, Point pt1, Point pt2, Point pt3, Point pt4) {
+	Mat warp_dst;
+	Size size(src.cols, src.rows);
+	Point2f src_vertices[4];
+	Point2f dst_vertices[4];
 
-	cv::Point2f src_vertices[4];
 	src_vertices[0] = pt1;
 	src_vertices[1] = pt2;
 	src_vertices[2] = pt3;
 	src_vertices[3] = pt4;
 
-	cv::Point2f dst_vertices[4];
 	dst_vertices[0] = Point(src.cols * 0.5, pt1.y);
 	dst_vertices[1] = Point(src.cols * 0.5, pt2.y);
 	dst_vertices[2] = Point(src.cols, pt2.y);
-	dst_vertices[3] = Point(src.cols, 0);
+	dst_vertices[3] = Point(src.cols, pt1.y);
 
 	Mat warpAffineMatrix = getAffineTransform(src_vertices, dst_vertices);
 
-	cv::Mat rotated;
-	cv::Size size(src.cols, src.rows);
-	warpAffine(src, rotated, warpAffineMatrix, size, INTER_LINEAR,
+	warpAffine(src, warp_dst, warpAffineMatrix, size, INTER_LINEAR,
 			BORDER_CONSTANT);
 
-	return rotated;
+	return warp_dst;
 }
 
-// http://cboard.cprogramming.com/contests-board/91606-fastest-sigmoid-function-2.html
 /* For an array value, or most values of x, citizen_sig will return the resulting
  * value for that x. citizen_sig does not draw the resulting curve for several
  * values of x.  citizen_sig also returns EDOM if x is outside its domain.
+ * // http://cboard.cprogramming.com/contests-board/91606-fastest-sigmoid-function-2.html
  */
 double sigmoid(double x) {
 	double square_of_x, div;
@@ -93,9 +105,11 @@ double sigmoid(double x) {
 		return x / div;
 }
 
-// Finds the intersection of two lines, or returns false.
-// The lines are defined by (o1, p1) and (o2, p2).
-// http://answers.opencv.org/question/9511/how-to-find-the-intersection-point-of-two-lines/
+/*
+ *  Finds the intersection of two lines, or returns false.
+ *  The lines are defined by (o1, p1) and (o2, p2).
+ *  http://answers.opencv.org/question/9511/how-to-find-the-intersection-point-of-two-lines
+ */
 bool intersection(Point2f o1, Point2f p1, Point2f o2, Point2f p2, Point2f &r) {
 	Point2f x = o2 - o1;
 	Point2f d1 = p1 - o1;
@@ -111,7 +125,7 @@ bool intersection(Point2f o1, Point2f p1, Point2f o2, Point2f p2, Point2f &r) {
 }
 
 // http://stackoverflow.com/questions/15771512/compare-histograms-of-grayscale-images-in-opencv
-double getMassCenter(std::string const& name, Mat1b const& image) {
+double get_mass_center(std::string const& name, Mat1b const& image) {
 	// Set histogram bins count
 	int bins = 256;
 	int histSize[] = { bins };
@@ -153,8 +167,8 @@ double getMassCenter(std::string const& name, Mat1b const& image) {
 	int mc = sum1 / sum2;
 
 	// show and save histograms
-//    circle(hist_image,Point(mc, 255),5,cvScalar(255,0,0),-1,8);
-//    cv::imwrite(std::string("histograms/") + name + ".png",hist_image); // save
+    circle(hist_image,Point(mc, 255),5,cvScalar(255,0,0),-1,8);
+    cv::imwrite(std::string("histograms/") + name + ".png",hist_image); // save
 //    cv::imshow(name, hist_image);
 
 	return mc;
@@ -165,21 +179,26 @@ static void error(const char* s1, const char* s2) {
 	exit(1);
 }
 
+/**
+ * Get mid point coordinates from 2 points.
+ */
 Point midpoint(double x1, double y1, double x2, double y2) {
 	return Point((x1 + x2) / 2, (y1 + y2) / 2);
 }
 
-// get STASM points
-std::vector<cv::Point> getStasmArray(char* imgPath, int shape) {
+/**
+ * Get STASM points array from image.
+ */
+vector<Point> get_stasm_pts(char* imgPath, int shape) {
 
-	std::vector<cv::Point> stasmArray;
+	vector<Point> pts_array;
 
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	static const char* path = imgPath; //"data/copy of feret_1.jpg";
+	static const char* path = imgPath;
 
-	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
+	Mat_<unsigned char> img(imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
 	if (!img.data)
 		error("Cannot load", path);
@@ -187,6 +206,8 @@ std::vector<cv::Point> getStasmArray(char* imgPath, int shape) {
 	if (!stasm_open_image((const char*) img.data, img.cols, img.rows, path,
 			1 /*multiface*/, 10 /*minwidth*/))
 		error("stasm_open_image failed: ", stasm_lasterr());
+
+
 
 	int foundface;
 	float landmarks[2 * stasm_NLANDMARKS]; // x,y coords (note the 2)
@@ -204,19 +225,19 @@ std::vector<cv::Point> getStasmArray(char* imgPath, int shape) {
 		// draw the landmarks on the image as white dots
 		stasm_force_points_into_image(landmarks, img.cols, img.rows);
 		for (int i = 0; i < shape; i++)
-			stasmArray.push_back(
+			pts_array.push_back(
 					Point(cvRound(landmarks[i * 2]),
 							cvRound(landmarks[i * 2 + 1])));
 
 	}
-	return stasmArray;
+	return pts_array;
 }
 
 int main() {
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	static const char* path = "2013-11-12-001446.jpg";
+	static const char* path = "scarlett_johansson_eyes_smile.jpg";
 
 	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
@@ -380,64 +401,6 @@ int main() {
 						p8.y - (cvRound(length * 0.1) * 0.5),
 						cvRound(length * 0.1), cvRound(length * 0.1)));
 
-		/*
-		 // rectangle draws
-		 rectangle( img,
-		 Point( p1.x - cvRound(length*0.1/2), p1.y - (cvRound(length*0.1/2))),
-		 Point( p1.x + cvRound(length*0.1/2), p1.y + cvRound(length*0.1/2)),
-		 Scalar( 0, 255, 255 ),
-		 1,
-		 1 );
-
-		 rectangle( img,
-		 Point( p2.x - cvRound(img.cols*0.1/2), p2.y - (cvRound(img.rows*0.1/2))),
-		 Point( p2.x + cvRound(img.cols*0.1/2), p2.y + cvRound(img.rows*0.1/2)),
-		 Scalar( 0, 255, 255 ),
-		 1,
-		 1 );
-
-		 rectangle( img,
-		 Point( p3.x - cvRound(img.cols*0.1/2), p3.y - (cvRound(img.rows*0.1/2))),
-		 Point( p3.x + cvRound(img.cols*0.1/2), p3.y + cvRound(img.rows*0.1/2)),
-		 Scalar( 0, 255, 255 ),
-		 1,
-		 1 );
-
-		 rectangle( img,
-		 Point( p4.x - cvRound(img.cols*0.1/2), p4.y - (cvRound(img.rows*0.1/2))),
-		 Point( p4.x + cvRound(img.cols*0.1/2), p4.y + cvRound(img.rows*0.1/2)),
-		 Scalar( 0, 255, 255 ),
-		 1,
-		 1 );
-
-		 rectangle( img,
-		 Point( p5.x - cvRound(img.cols*0.1/2), p5.y - (cvRound(img.rows*0.1/2))),
-		 Point( p5.x + cvRound(img.cols*0.1/2), p5.y + cvRound(img.rows*0.1/2)),
-		 Scalar( 0, 255, 255 ),
-		 1,
-		 1 );
-
-		 rectangle( img,
-		 Point( p6.x - cvRound(img.cols*0.1/2), p6.y - (cvRound(img.rows*0.1/2))),
-		 Point( p6.x + cvRound(img.cols*0.1/2), p6.y + cvRound(img.rows*0.1/2)),
-		 Scalar( 0, 255, 255 ),
-		 1,
-		 1 );
-
-		 rectangle( img,
-		 Point( p7.x - cvRound(img.cols*0.1/2), p7.y - (cvRound(img.rows*0.1/2))),
-		 Point( p7.x + cvRound(img.cols*0.1/2), p7.y + cvRound(img.rows*0.1/2)),
-		 Scalar( 0, 255, 255 ),
-		 1,lipTop
-		 1 );
-
-		 rectangle( img,
-		 Point( p8.x - cvRound(img.cols*0.1/2), p8.y - (cvRound(img.rows*0.1/2))),
-		 Point( p8.x + cvRound(img.cols*0.1/2), p8.y + cvRound(img.rows*0.1/2)),
-		 Scalar( 0, 255, 255 ),
-		 1,
-		 1 );
-		 */
 
 		cv::imwrite("histograms/w1.png", subMatPt1); // save
 		cv::imwrite("histograms/w2.png", subMatPt2); // save
@@ -450,14 +413,14 @@ int main() {
 
 		// histograms
 		// ver http://docs.opencv.org/doc/tutorials/imgproc/histograms/histogram_calculation/histogram_calculation.html
-		double mc_w1 = (double) getMassCenter("h1", subMatPt1);
-		double mc_w2 = (double) getMassCenter("h2", subMatPt2);
-		double mc_w3 = (double) getMassCenter("h3", subMatPt3);
-		double mc_w4 = (double) getMassCenter("h4", subMatPt4);
-		double mc_w5 = (double) getMassCenter("h5", subMatPt5);
-		double mc_w6 = (double) getMassCenter("h6", subMatPt6);
-		double mc_w7 = (double) getMassCenter("h7", subMatPt7);
-		double mc_w8 = (double) getMassCenter("h8", subMatPt8);
+		double mc_w1 = (double) get_mass_center("h1", subMatPt1);
+		double mc_w2 = (double) get_mass_center("h2", subMatPt2);
+		double mc_w3 = (double) get_mass_center("h3", subMatPt3);
+		double mc_w4 = (double) get_mass_center("h4", subMatPt4);
+		double mc_w5 = (double) get_mass_center("h5", subMatPt5);
+		double mc_w6 = (double) get_mass_center("h6", subMatPt6);
+		double mc_w7 = (double) get_mass_center("h7", subMatPt7);
+		double mc_w8 = (double) get_mass_center("h8", subMatPt8);
 
 		/*vector<int> vector_mc;
 
@@ -497,132 +460,155 @@ int main() {
 
 		// C. POSE NORMALIZATION ###########################################
 
-		Mat poseNormImg(img.rows, img.cols, CV_8UC1);
-
 		// 4.(a) rotation
 		double theta_deg = theta * 180 / CV_PI;
 		img = rotateImage(img, -180 + theta_deg);
-		//cv::imshow("rotatedImg", poseNormImg);
+//		cv::imshow("rotatedImg", img);
+//		cv::waitKey(0);
 
 		// 4.(b) horizontal flip if dr smaller than dl
-		if (gsl_fcmp(dl, dr, DBL_EPSILON) == 1) {
-			flip(img, img, 1); // x = y returns 0; if x < y returns -1; x > y returns +1;
+		if (gsl_fcmp(dl, dr, DBL_EPSILON) > 0) { // x = y returns 0; if x < y returns -1; x > y returns +1;
+			flip(img, img, 1);
 		}
+//		cv::imshow("horizontal flip", img);
+//		cv::waitKey(0);
 
 		// imagem rodada theta graus, nova verificação das coordenadas dos pontos devido à rotação
-		imwrite("img.jpg", img);
+		imwrite("tmp.jpg", img);
+		std::vector<Point> roi_vector = get_stasm_pts("tmp.jpg", 68); // ok até aqui
 
-		std::vector<Point> roi_vector = getStasmArray("img.jpg", 77);
+		int x1 = roi_vector.at(1).x - 5;
+		int y1 = roi_vector.at(23).y - 40;
+		int x2 = roi_vector.at(13).x + 5;
+		int y2 = roi_vector.at(7).y + 10;
 
-		Point CForehead = roi_vector.at(14);
-		Point LJawNoseline = roi_vector.at(2);
-		Point RJaw11 = roi_vector.at(11);
+		int width = x2 - x1;
+		int height = y2 - y1;
 
-		int width = RJaw11.x - LJawNoseline.x;
-		int height = CTipOfChin.y - CForehead.y;
+//		Mat roi = img(Rect(LJawNoseline.x - 5, CForehead.y, width + 5, height + 5));
 
-		//crop face
-		Mat roi = img(
-				Rect(LJawNoseline.x - 5, CForehead.y, width + 5, height + 5));
+		Mat crop = img(Rect(x1, y1, width, height));
 
-		imwrite("img.jpg", roi);
-		roi_vector.clear();
+		imwrite("tmp.jpg", crop);
+		imshow("crop", crop);
 
 		// 4. (c) stretching
+		std::vector<Point> stasm_vector = get_stasm_pts("tmp.jpg", 68);
 
-		std::vector<Point> stasm_vector = getStasmArray("img.jpg", 68);
 
-		Point topCenter = Point(roi.cols * 0.5, 0);
 		Point noseTop = midpoint(stasm_vector.at(24).x, stasm_vector.at(24).y,
 				stasm_vector.at(18).x, stasm_vector.at(18).y);
+		Point topCenter = Point(noseTop.x, 0);
 		Point noseTip = stasm_vector.at(67);
 		Point noseBase = stasm_vector.at(41);
 		Point lipTop = stasm_vector.at(51);
 		Point lipBottom = stasm_vector.at(57);
 		Point chinTip = stasm_vector.at(7);
-		Point bottomCenter = Point(roi.cols * 0.5, roi.rows);
-		Point bottomRight = Point(roi.cols, roi.rows);
-		Point topRight = Point(roi.cols, 0);
+		Point bottomCenter = Point(chinTip.x, crop.rows);
+		Point bottomRight = Point(crop.cols, crop.rows);
+		Point topRight = Point(crop.cols, 0);
 
-		/*
 		int thickness = -1;
 		int lineType = 8;
 
-		circle(roi, topCenter, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(roi, noseTop, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(roi, noseTip, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(roi, noseBase, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(roi, lipTop, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(roi, lipBottom, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(roi, chinTip, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(roi, bottomCenter, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(roi, bottomRight, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(roi, topRight, 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(crop, topCenter, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, noseTop, 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(crop, noseTip, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, noseBase, 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(crop, lipTop, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, lipBottom, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, chinTip, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, bottomCenter, 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(crop, bottomRight, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, topRight, 2, Scalar(0, 255, 255), thickness, lineType);
+//
+//		line(crop, topCenter, noseTop, 255, 1, 8, 0);
+//		line(crop, noseTop, noseTip, 255, 1, 8, 0);
+//		line(crop, noseTip, noseBase, 255, 1, 8, 0);
+//		line(crop, noseBase, lipTop, 255, 1, 8, 0);
+//		line(crop, lipTop, lipBottom, 255, 1, 8, 0);
+//		line(crop, lipBottom, chinTip, 255, 1, 8, 0);
+//		line(crop, chinTip, bottomCenter, 255, 1, 8, 0);
+//		line(crop, bottomCenter, bottomRight, 255, 1, 8, 0);
+//		line(crop, bottomRight, topRight, 255, 1, 8, 0);
+//		line(crop, topRight, topCenter, 255, 1, 8, 0);
+//
+//		line(crop, Point(0, noseTop.y), Point(crop.cols, noseTop.y), 255, 1, 8, 0);
+//		line(crop, Point(0, noseTip.y), Point(crop.cols, noseTip.y), 255, 1, 8, 0);
+//		line(crop, Point(0, noseBase.y), Point(crop.cols, noseBase.y), 255, 1, 8, 0);
+//		line(crop, Point(0, lipTop.y), Point(crop.cols, lipTop.y), 255, 1, 8, 0);
+//		line(crop, Point(0, lipBottom.y), Point(crop.cols, lipBottom.y), 255, 1, 8, 0);
+//		line(crop, Point(0, chinTip.y), Point(crop.cols, chinTip.y), 255, 1, 8, 0);
 
-		line(roi, topCenter, noseTop, 255, 1, 8, 0);
-		line(roi, noseTop, noseTip, 255, 1, 8, 0);
-		line(roi, noseTip, noseBase, 255, 1, 8, 0);
-		line(roi, noseBase, lipTop, 255, 1, 8, 0);
-		line(roi, lipTop, lipBottom, 255, 1, 8, 0);
-		line(roi, lipBottom, chinTip, 255, 1, 8, 0);
-		line(roi, chinTip, bottomCenter, 255, 1, 8, 0);
-		line(roi, bottomCenter, bottomRight, 255, 1, 8, 0);
-		line(roi, bottomRight, topRight, 255, 1, 8, 0);
-		line(roi, topRight, topCenter, 255, 1, 8, 0);
-		*/
+		imshow("roi - lines", crop);
 
-		imshow("roi - lines", roi);
+		cv::Mat out(crop.rows, crop.cols, CV_8U);
+		cv::Mat out2(crop.rows, crop.cols, CV_8U);
 
-		cv::Mat out(roi.rows, roi.cols, CV_8U);
-		cv::Mat out2(roi.rows, roi.cols, CV_8U);
+		Mat d1 = correct_perpective(crop, topCenter, noseTop,
+				Point(crop.cols, noseTop.y), topRight);
+		Mat d2 = correct_perpective(crop, noseTop, noseTip,
+				Point(crop.cols, noseTip.y), Point(crop.cols, noseTop.y));
+		Mat d3 = correct_perpective(crop, noseTip, noseBase,
+				Point(crop.cols, noseBase.y), Point(crop.cols, noseTip.y));
+		Mat d4 = correct_perpective(crop, noseBase, lipTop,
+				Point(crop.cols, lipTop.y), Point(crop.cols, noseBase.y));
+		Mat d5 = correct_perpective(crop, lipTop, lipBottom,
+				Point(crop.cols, lipBottom.y), Point(crop.cols, lipTop.y));
+		Mat d6 = correct_perpective(crop, lipBottom, chinTip,
+				Point(crop.cols, chinTip.y), Point(crop.cols, lipBottom.y));
+		Mat d7 = correct_perpective(crop, chinTip, bottomCenter, bottomRight,
+				Point(crop.cols, chinTip.y));
 
-		Mat d1 = deskewing(roi, topCenter, noseTop, Point(roi.cols, noseTop.y),
-				topRight);
-		Mat d2 = deskewing(roi, noseTop, noseTip, Point(roi.cols, noseTip.y),
-				Point(roi.cols, noseTop.y));
-		Mat d3 = deskewing(roi, noseTip, noseBase, Point(roi.cols, noseBase.y),
-				Point(roi.cols, noseTip.y));
-		Mat d4 = deskewing(roi, noseBase, lipTop, Point(roi.cols, lipTop.y),
-				Point(roi.cols, noseBase.y));
-		Mat d5 = deskewing(roi, lipTop, lipBottom, Point(roi.cols, lipBottom.y),
-				Point(roi.cols, lipTop.y));
-		Mat d6 = deskewing(roi, lipBottom, chinTip, Point(roi.cols, chinTip.y),
-				Point(roi.cols, lipBottom.y));
-		Mat d7 = deskewing(roi, chinTip, bottomCenter, bottomRight,
-				Point(roi.cols, chinTip.y));
-
-		for (int row = 0; row < roi.rows; row++) {
-			if (row < noseTop.y) {
-				d1.row(row).copyTo(out.row(row));
-			} else if (row < noseTip.y) {
-				d2.row(row).copyTo(out.row(row));
-			} else if (row < noseBase.y) {
-				d3.row(row).copyTo(out.row(row));
-			} else if (row < lipTop.y) {
-				d4.row(row).copyTo(out.row(row));
-			} else if (row < lipBottom.y) {
-				d5.row(row).copyTo(out.row(row));
-			} else if (row < chinTip.y) {
-				d6.row(row).copyTo(out.row(row));
+		for (int r = 0; r < crop.rows; r++) {
+			if (r < noseTop.y) {
+				d1.row(r).copyTo(out.row(r));
+			} else if (r < noseTip.y) {
+				d2.row(r).copyTo(out.row(r));
+			} else if (r < noseBase.y) {
+				d3.row(r).copyTo(out.row(r));
+			} else if (r < lipTop.y) {
+				d4.row(r).copyTo(out.row(r));
+			} else if (r < lipBottom.y) {
+				d5.row(r).copyTo(out.row(r));
+			} else if (r < chinTip.y) {
+				d6.row(r).copyTo(out.row(r));
 			} else {
-				d7.row(row).copyTo(out.row(row));
+				d7.row(r).copyTo(out.row(r));
 			}
 		}
 
 		imshow("rows stretched equally", out);
 
-		for (int row = 0; row < roi.rows; row++) {
-			for (int col = 0; col < roi.cols; col++) {
-				if (col < roi.cols * 0.5)
+		for (int row = 0; row < crop.rows; row++) {
+			for (int col = 0; col < crop.cols; col++) {
+				if (col < crop.cols * 0.5)
 					out2.at<uchar>(row, col) = out.at<uchar>(row, -col);
 				else
 					out2.at<uchar>(row, col) = out.at<uchar>(row, col);
 			}
 		}
 
+		imwrite("tmp.jpg", out2);
+		std::vector<Point> stasm_vector2 = get_stasm_pts("tmp.jpg", 68);
+
+//		circle(out2, midpoint(stasm_vector2.at(24).x, stasm_vector2.at(24).y, stasm_vector2.at(18).x, stasm_vector2.at(18).y), 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(67), 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(41), 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(51), 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(57), 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(7), 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(32), 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(33), 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(34), 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(35), 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(36), 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(13), 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(out2, stasm_vector2.at(16), 2, Scalar(0, 255, 255), thickness, lineType);
+
 		imshow("Mirror right to left", out2);
 
-		// 4.(f)
+		// 4.(f) função sqi
 		Mat illumNorn;
 
 		IplImage copy = out2;
@@ -630,20 +616,19 @@ int main() {
 		illumNorn = Mat(SQI(&copy));
 
 		/*Mat imageSQItest;
-		imageSQItest = imread("Screenshot - 09-11-2013 - 16:20:17.png", CV_LOAD_IMAGE_GRAYSCALE);   // Read the file
+		 imageSQItest = imread("Screenshot - 09-11-2013 - 16:20:17.png", CV_LOAD_IMAGE_GRAYSCALE);   // Read the file
 
-		if(! imageSQItest.data )                              // Check for invalid input
-		{
-			cout <<  "Could not open or find the image" << std::endl ;
-			return -1;
-		}
+		 if(! imageSQItest.data )                              // Check for invalid input
+		 {
+		 cout <<  "Could not open or find the image" << std::endl ;
+		 return -1;
+		 }
 
-		IplImage copy = imageSQItest;
+		 IplImage copy = imageSQItest;
 
-		illumNorn = Mat(SQI(&copy));*/
+		 illumNorn = Mat(SQI(&copy));*/
 
 		imshow("illumination norm with SQI", illumNorn);
-
 		nfaces++;
 	}
 
