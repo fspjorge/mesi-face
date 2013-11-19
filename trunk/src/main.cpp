@@ -65,21 +65,19 @@ int max_value(int a, int b) {
  * |         |
  * 2---------3
  */
-Mat correct_perpective(Mat src, Point pt1, Point pt2, Point pt3, Point pt4) {
+Mat correct_perpective(Mat src, Point pt1, Point pt2, Point pt3) {
 	Mat warp_dst;
 	Size size(src.cols, src.rows);
-	Point2f src_vertices[4];
-	Point2f dst_vertices[4];
+	Point2f src_vertices[3];
+	Point2f dst_vertices[3];
 
 	src_vertices[0] = pt1;
 	src_vertices[1] = pt2;
 	src_vertices[2] = pt3;
-	src_vertices[3] = pt4;
 
-	dst_vertices[0] = Point(src.cols * 0.5, pt1.y);
-	dst_vertices[1] = Point(src.cols * 0.5, pt2.y);
+	dst_vertices[0] = Point(src.cols * 0.5 - 1, pt1.y);
+	dst_vertices[1] = Point(src.cols * 0.5 - 1, pt2.y);
 	dst_vertices[2] = Point(src.cols, pt2.y);
-	dst_vertices[3] = Point(src.cols, pt1.y);
 
 	Mat warpAffineMatrix = getAffineTransform(src_vertices, dst_vertices);
 
@@ -95,6 +93,7 @@ Mat correct_perpective(Mat src, Point pt1, Point pt2, Point pt3, Point pt4) {
  * // http://cboard.cprogramming.com/contests-board/91606-fastest-sigmoid-function-2.html
  */
 double sigmoid(double x) {
+
 	double square_of_x, div;
 
 	errno = 0;
@@ -148,8 +147,8 @@ double get_mass_center(std::string const& name, Mat1b const& image) {
 
 	double max_val = 0;
 	minMaxLoc(hist, 0, &max_val);
-	int sum1 = 0;
-	int sum2 = -256;
+	double sum1 = 0;
+	double sum2 = -256;
 
 	// visualize each bin
 	for (int b = 0; b < bins; b++) {
@@ -163,9 +162,9 @@ double get_mass_center(std::string const& name, Mat1b const& image) {
 		sum2 += height;
 		//printf("sum2=%d\n", sum2);
 	}
-	printf("sum1=%d / sum2=%d | mc = %d\n", sum1, sum2, sum1 / sum2);
+	printf("sum1=%f / sum2=%f | mc = %f\n", sum1, sum2, sum1 / sum2);
 	// mc formula
-	int mc = sum1 / sum2;
+	double mc = sum1 / sum2;
 
 	// show and save histograms
 	circle(hist_image, Point(mc, 255), 5, cvScalar(255, 0, 0), -1, 8);
@@ -232,23 +231,28 @@ vector<Point> get_stasm_pts(char* imgPath, int shape) {
 	return pts_array;
 }
 
-
 /**
  * recalculation of STASM points coordinates.
  */
 vector<Point> get_new_stasm_pts(Mat src, int shape) {
 	imwrite("tmp.jpg", src);
 	char *tmp = new char[10];
-	strcpy( tmp, "tmp.jpg" );
-	return get_stasm_pts(tmp, shape); // ok até aqui
-}
+	strcpy(tmp, "tmp.jpg");
+	vector<Point> pts = get_stasm_pts(tmp, shape);
 
+	if (remove("tmp.jpg") != 0)
+		perror("Error deleting file tmp.jpg");
+	else
+		puts("File tmp.jpg successfully deleted");
+
+	return pts;
+}
 
 int main() {
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	static const char* path = "scarlett_johansson_eyes_smile.jpg";
+	static const char* path = "2013-11-18-173422.jpg";
 
 	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
@@ -272,12 +276,6 @@ int main() {
 
 		// for demonstration, convert from Stasm 77 points to XM2VTS 68 points
 		stasm_convert_shape(landmarks, 77);
-
-//        // draw the landmarks on the image as white dots
-//        stasm_force_points_into_image(landmarks, img.cols, img.rows);
-//        for (int i = 0; i < stasm_NLANDMARKS; i++)
-//        	img(cvRound(landmarks[38*2+1]), cvRound(landmarks[38*2])) = 255;
-//      		img(cvRound(landmarks[39*2+1]), cvRound(landmarks[39*2])) = 255;
 
 		Point LPupil = Point(cvRound(landmarks[38 * 2]),
 				cvRound(landmarks[38 * 2 + 1]));
@@ -310,23 +308,20 @@ int main() {
 		// roll
 		double theta = atan2((double) LPupil.y - RPupil.y, LPupil.x - RPupil.x); //deg = * 180 / CV_PI;
 		printf("theta = %f degrees\n", theta);
-
-		double roll = min(2 * theta / CV_PI, 1.0); // rad
+		double roll = min(abs((2 * theta) / CV_PI), 1.0); // rad
 		printf("roll = %f\n", roll);
 
 		// yaw ()
 		// cálculo do dl e dr (http://answers.opencv.org/question/14188/calc-eucliadian-distance-between-two-single-point/)
 		double dl = cv::norm(LPupil - CNoseTip);
 		double dr = cv::norm(RPupil - CNoseTip);
-
 		double yaw = (max(dl, dr) - min(dl, dr)) / max(dl, dr);
 		printf("yaw = %f\n", yaw);
 
 		// pitch
 		double eu = cv::norm(LEyebrowInner - CNoseTip);
-		double cd = cv::norm(CNoseBase - CTipOfChin);
-
-		double pitch = (max(eu, cd) - min(eu, cd)) / max(eu, cd);
+		double ed = cv::norm(CNoseBase - CTipOfChin);
+		double pitch = (max(eu, ed) - min(eu, ed)) / max(eu, ed);
 		printf("pitch = %f\n", pitch);
 
 		// SP
@@ -340,6 +335,8 @@ int main() {
 
 		// SI
 		// SI = 1 - F(std(mc))
+
+
 
 		// Finding the 8 points
 		Point p1 = midpoint((double) cvRound(landmarks[0 * 2]),
@@ -364,13 +361,7 @@ int main() {
 				(double) cvRound(landmarks[9 * 2]),
 				(double) cvRound(landmarks[9 * 2 + 1]));
 
-		// For each such reference point, we select the corresponding region w of the image, whose size is proportional to the square containing the whole face.
-		// http://stackoverflow.com/questions/12369697/access-sub-matrix-of-a-multidimensional-mat-in-opencv
-		// Parameters:
-		// x – x-coordinate of the top-left corner.
-		// y – y-coordinate of the top-left corner (sometimes bottom-left corner).
-		// width – width of the rectangle.
-		// height – height of the rectangle.
+
 
 		int length;
 
@@ -484,12 +475,20 @@ int main() {
 //		cv::waitKey(0);
 
 		// imagem rodada theta graus, nova verificação das coordenadas dos pontos devido à rotação
-		std::vector<Point> roi_vector = get_new_stasm_pts(img, 68); // ok até aqui
+		std::vector<Point> roi_vector = get_new_stasm_pts(img, 68);
 
-		int x1 = roi_vector.at(1).x - 5;
-		int y1 = roi_vector.at(23).y - 40;
-		int x2 = roi_vector.at(13).x + 5;
-		int y2 = roi_vector.at(7).y + 10;
+		int x1, y1, x2, y2;
+
+		try {
+			x1 = roi_vector.at(1).x - 5;
+			y1 = roi_vector.at(23).y - 40;
+			x2 = roi_vector.at(13).x + 5;
+			y2 = roi_vector.at(7).y + 10;
+		} catch (const std::out_of_range& oor) {
+			std::cerr << "Unable to crop image! Reason: Out of Range error: "
+					<< oor.what() << '\n';
+			break;
+		}
 
 		int width = x2 - x1;
 		int height = y2 - y1;
@@ -553,19 +552,18 @@ int main() {
 		cv::Mat out2(crop.rows, crop.cols, CV_8U);
 
 		Mat d1 = correct_perpective(crop, topCenter, noseTop,
-				Point(crop.cols, noseTop.y), topRight);
+				Point(crop.cols, noseTop.y));
 		Mat d2 = correct_perpective(crop, noseTop, noseTip,
-				Point(crop.cols, noseTip.y), Point(crop.cols, noseTop.y));
+				Point(crop.cols, noseTip.y));
 		Mat d3 = correct_perpective(crop, noseTip, noseBase,
-				Point(crop.cols, noseBase.y), Point(crop.cols, noseTip.y));
+				Point(crop.cols, noseBase.y));
 		Mat d4 = correct_perpective(crop, noseBase, lipTop,
-				Point(crop.cols, lipTop.y), Point(crop.cols, noseBase.y));
+				Point(crop.cols, lipTop.y));
 		Mat d5 = correct_perpective(crop, lipTop, lipBottom,
-				Point(crop.cols, lipBottom.y), Point(crop.cols, lipTop.y));
+				Point(crop.cols, lipBottom.y));
 		Mat d6 = correct_perpective(crop, lipBottom, chinTip,
-				Point(crop.cols, chinTip.y), Point(crop.cols, lipBottom.y));
-		Mat d7 = correct_perpective(crop, chinTip, bottomCenter, bottomRight,
 				Point(crop.cols, chinTip.y));
+		Mat d7 = correct_perpective(crop, chinTip, bottomCenter, bottomRight);
 
 		for (int r = 0; r < crop.rows; r++) {
 			if (r < noseTop.y) {
@@ -590,7 +588,7 @@ int main() {
 		for (int row = 0; row < crop.rows; row++) {
 			for (int col = 0; col < crop.cols; col++) {
 				if (col < crop.cols * 0.5)
-					out2.at<uchar>(row, col) = out.at<uchar>(row, -col);
+					out2.at<uchar>(row, col) = out.at<uchar>(row + 1, -col);
 				else
 					out2.at<uchar>(row, col) = out.at<uchar>(row, col);
 			}
@@ -612,7 +610,7 @@ int main() {
 //		circle(out2, stasm_vector2.at(13), 2, Scalar(0, 0, 255), thickness, lineType);
 //		circle(out2, stasm_vector2.at(16), 2, Scalar(0, 255, 255), thickness, lineType);
 
-//		imshow("Mirror right to left", out2);
+		imshow("Mirror right to left", out2);
 
 		// 4.(f) função sqi
 		Mat illumNorn;
