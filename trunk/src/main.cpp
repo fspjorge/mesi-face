@@ -1,6 +1,6 @@
-// code based on minimal2.cpp: Display the landmarks of possibly multiple faces in an image.
 /**
  * Author: Jorge Pereira
+ * Code based on the example "minimal2.cpp" provided by Stephen Milborrow along with the STASM library.
  */
 
 #include <stdio.h>
@@ -39,7 +39,10 @@ CvMat* Conv_Weighted_Gaussian(IplImage *inp_img, CvMat *kernel);
 CvMat* Gaussian(int size);
 IplImage* SQI(IplImage* inp);
 
-// http://stackoverflow.com/questions/2289690/opencv-how-to-rotate-iplimage
+/**
+ * Rotate image depending on the angle.
+ * From http://stackoverflow.com/questions/2289690/opencv-how-to-rotate-iplimage
+ */
 Mat rotateImage(const Mat& source, double angle) {
 	Point2f src_center(source.cols / 2.0F, source.rows / 2.0F);
 	Mat rot_mat = getRotationMatrix2D(src_center, angle, 1.0);
@@ -49,21 +52,12 @@ Mat rotateImage(const Mat& source, double angle) {
 	return dst;
 }
 
-int min_value(int a, int b) {
-	return ((a < b) ? (a) : (b));
-}
-
-int max_value(int a, int b) {
-	return ((a > b) ? (a) : (b));
-}
-
 /**
- * http://stackoverflow.com/questions/7838487/executing-cvwarpperspective-for-a-fake-deskewing-on-a-set-of-cvpoint
- * 1---------4
- * |         |
- * |         |
- * |         |
- * 2---------3
+ * Affine transformations to correct the band perspective.
+ * Code based on http://stackoverflow.com/questions/7838487/executing-cvwarpperspective-for-a-fake-deskewing-on-a-set-of-cvpoint
+ * 1-----3
+ * |  -
+ * 2-
  */
 Mat correct_perpective(Mat src, Point pt1, Point pt2, Point pt3) {
 	Mat warp_dst;
@@ -90,7 +84,7 @@ Mat correct_perpective(Mat src, Point pt1, Point pt2, Point pt3) {
 /* For an array value, or most values of x, citizen_sig will return the resulting
  * value for that x. citizen_sig does not draw the resulting curve for several
  * values of x.  citizen_sig also returns EDOM if x is outside its domain.
- * // http://cboard.cprogramming.com/contests-board/91606-fastest-sigmoid-function-2.html
+ * From http://cboard.cprogramming.com/contests-board/91606-fastest-sigmoid-function-2.html
  */
 double sigmoid(double x) {
 
@@ -105,26 +99,10 @@ double sigmoid(double x) {
 		return x / div;
 }
 
-/*
- *  Finds the intersection of two lines, or returns false.
- *  The lines are defined by (o1, p1) and (o2, p2).
- *  http://answers.opencv.org/question/9511/how-to-find-the-intersection-point-of-two-lines
+/**
+ * Returns the value of the center of mass for each submatrix.
+ * From http://stackoverflow.com/questions/15771512/compare-histograms-of-grayscale-images-in-opencv
  */
-bool intersection(Point2f o1, Point2f p1, Point2f o2, Point2f p2, Point2f &r) {
-	Point2f x = o2 - o1;
-	Point2f d1 = p1 - o1;
-	Point2f d2 = p2 - o2;
-
-	float cross = d1.x * d2.y - d1.y * d2.x;
-	if (abs(cross) < /*EPS*/1e-8)
-		return false;
-
-	double t1 = (x.x * d2.y - x.y * d2.x) / cross;
-	r = o1 + d1 * t1;
-	return true;
-}
-
-// http://stackoverflow.com/questions/15771512/compare-histograms-of-grayscale-images-in-opencv
 double get_mass_center(std::string const& name, Mat1b const& image) {
 	// Set histogram bins count
 	int bins = 256;
@@ -180,7 +158,7 @@ static void error(const char* s1, const char* s2) {
 }
 
 /**
- * Get mid point coordinates from 2 points.
+ * Returns the midpoint coordinates.
  */
 Point midpoint(double x1, double y1, double x2, double y2) {
 	return Point((x1 + x2) / 2, (y1 + y2) / 2);
@@ -232,7 +210,7 @@ vector<Point> get_stasm_pts(char* imgPath, int shape) {
 }
 
 /**
- * recalculation of STASM points coordinates.
+ * Corrects the STASM points coordinates caused by the rotation of the original image.
  */
 vector<Point> get_new_stasm_pts(Mat src, int shape) {
 	imwrite("tmp.jpg", src);
@@ -252,7 +230,7 @@ int main() {
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	static const char* path = "2013-11-18-173422.jpg";
+	static const char* path = "elizabeth-hurley-diamond-face.jpg";
 
 	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
@@ -323,7 +301,6 @@ int main() {
 		double ed = cv::norm(CNoseBase - CTipOfChin);
 		double pitch = (max(eu, ed) - min(eu, ed)) / max(eu, ed);
 		printf("pitch = %f\n", pitch);
-
 		// SP
 		// being alpha = 0.1, beta = 0.6 and gamma = 0.3 | article page 153
 		double alpha = 0.1;
@@ -335,33 +312,35 @@ int main() {
 
 		// SI
 		// SI = 1 - F(std(mc))
-
-
+		Point p1, p2, p3, p4, p5, p6, p7, p8;
 
 		// Finding the 8 points
-		Point p1 = midpoint((double) cvRound(landmarks[0 * 2]),
-				(double) cvRound(landmarks[0 * 2 + 1]),
-				(double) cvRound(landmarks[58 * 2]),
-				(double) cvRound(landmarks[58 * 2 + 1]));
-		Point p2 = midpoint((double) cvRound(landmarks[3 * 2]),
-				(double) cvRound(landmarks[3 * 2 + 1]),
-				(double) cvRound(landmarks[58 * 2]),
-				(double) cvRound(landmarks[58 * 2 + 1]));
-		Point p3 = LEyebrowInner;
-		Point p4 = midpoint((double) LEyebrowInner.x, (double) LEyebrowInner.y,
-				(double) CNoseTip.x, (double) CNoseTip.y);
-		Point p5 = CNoseTip;
-		Point p6 = CTipOfChin;
-		Point p7 = midpoint((double) cvRound(landmarks[54 * 2]),
-				(double) cvRound(landmarks[54 * 2 + 1]),
-				(double) cvRound(landmarks[12 * 2]),
-				(double) cvRound(landmarks[12 * 2 + 1]));
-		Point p8 = midpoint((double) cvRound(landmarks[54 * 2]),
-				(double) cvRound(landmarks[54 * 2 + 1]),
-				(double) cvRound(landmarks[9 * 2]),
-				(double) cvRound(landmarks[9 * 2 + 1]));
-
-
+		try {
+			p1 = midpoint((double) cvRound(landmarks[0 * 2]),
+					(double) cvRound(landmarks[0 * 2 + 1]),
+					(double) cvRound(landmarks[58 * 2]),
+					(double) cvRound(landmarks[58 * 2 + 1]));
+			p2 = midpoint((double) cvRound(landmarks[3 * 2]),
+					(double) cvRound(landmarks[3 * 2 + 1]),
+					(double) cvRound(landmarks[58 * 2]),
+					(double) cvRound(landmarks[58 * 2 + 1]));
+			p3 = LEyebrowInner;
+			p4 = midpoint((double) LEyebrowInner.x, (double) LEyebrowInner.y,
+					(double) CNoseTip.x, (double) CNoseTip.y);
+			p5 = CNoseTip;
+			p6 = CTipOfChin;
+			p7 = midpoint((double) cvRound(landmarks[54 * 2]),
+					(double) cvRound(landmarks[54 * 2 + 1]),
+					(double) cvRound(landmarks[12 * 2]),
+					(double) cvRound(landmarks[12 * 2 + 1]));
+			p8 = midpoint((double) cvRound(landmarks[54 * 2]),
+					(double) cvRound(landmarks[54 * 2 + 1]),
+					(double) cvRound(landmarks[9 * 2]),
+					(double) cvRound(landmarks[9 * 2 + 1]));
+		} catch (Exception & e) {
+			cout << e.msg << endl;
+			break;
+		}
 
 		int length;
 
@@ -477,11 +456,11 @@ int main() {
 		// imagem rodada theta graus, nova verificação das coordenadas dos pontos devido à rotação
 		std::vector<Point> roi_vector = get_new_stasm_pts(img, 68);
 
+		// image crop for better results
 		int x1, y1, x2, y2;
-
 		try {
 			x1 = roi_vector.at(1).x - 5;
-			y1 = roi_vector.at(23).y - 40;
+			y1 = roi_vector.at(23).y - 50;
 			x2 = roi_vector.at(13).x + 5;
 			y2 = roi_vector.at(7).y + 10;
 		} catch (const std::out_of_range& oor) {
@@ -489,12 +468,8 @@ int main() {
 					<< oor.what() << '\n';
 			break;
 		}
-
 		int width = x2 - x1;
 		int height = y2 - y1;
-
-//		Mat roi = img(Rect(LJawNoseline.x - 5, CForehead.y, width + 5, height + 5));
-
 		Mat crop = img(Rect(x1, y1, width, height));
 
 		imshow("crop", crop);
@@ -514,19 +489,19 @@ int main() {
 		Point bottomRight = Point(crop.cols, crop.rows);
 		Point topRight = Point(crop.cols, 0);
 
-//		int thickness = -1;
-//		int lineType = 8;
+		int thickness = -1;
+		int lineType = 8;
 
-//		circle(crop, topCenter, 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(crop, noseTop, 2, Scalar(0, 0, 255), thickness, lineType);
-//		circle(crop, noseTip, 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(crop, noseBase, 2, Scalar(0, 0, 255), thickness, lineType);
-//		circle(crop, lipTop, 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(crop, lipBottom, 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(crop, chinTip, 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(crop, bottomCenter, 2, Scalar(0, 0, 255), thickness, lineType);
-//		circle(crop, bottomRight, 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(crop, topRight, 2, Scalar(0, 255, 255), thickness, lineType);
+		circle(crop, topCenter, 2, Scalar(0, 255, 255), thickness, lineType);
+		circle(crop, noseTop, 2, Scalar(0, 0, 255), thickness, lineType);
+		circle(crop, noseTip, 2, Scalar(0, 255, 255), thickness, lineType);
+		circle(crop, noseBase, 2, Scalar(0, 0, 255), thickness, lineType);
+		circle(crop, lipTop, 2, Scalar(0, 255, 255), thickness, lineType);
+		circle(crop, lipBottom, 2, Scalar(0, 255, 255), thickness, lineType);
+		circle(crop, chinTip, 2, Scalar(0, 255, 255), thickness, lineType);
+		circle(crop, bottomCenter, 2, Scalar(0, 0, 255), thickness, lineType);
+		circle(crop, bottomRight, 2, Scalar(0, 255, 255), thickness, lineType);
+		circle(crop, topRight, 2, Scalar(0, 255, 255), thickness, lineType);
 //
 //		line(crop, topCenter, noseTop, 255, 1, 8, 0);
 //		line(crop, noseTop, noseTip, 255, 1, 8, 0);
@@ -552,18 +527,20 @@ int main() {
 		cv::Mat out2(crop.rows, crop.cols, CV_8U);
 
 		Mat d1 = correct_perpective(crop, topCenter, noseTop,
-				Point(crop.cols, noseTop.y));
+				Point(crop.cols - (abs(topCenter.x - noseTop.x)), noseTop.y));
 		Mat d2 = correct_perpective(crop, noseTop, noseTip,
-				Point(crop.cols, noseTip.y));
+				Point(crop.cols - (abs(noseTop.x - noseTip.x)), noseTip.y));
 		Mat d3 = correct_perpective(crop, noseTip, noseBase,
-				Point(crop.cols, noseBase.y));
+				Point(crop.cols - (abs(noseTip.x - noseBase.x)), noseBase.y));
 		Mat d4 = correct_perpective(crop, noseBase, lipTop,
-				Point(crop.cols, lipTop.y));
+				Point(crop.cols - (abs(noseBase.x - lipTop.x)), lipTop.y));
 		Mat d5 = correct_perpective(crop, lipTop, lipBottom,
-				Point(crop.cols, lipBottom.y));
+				Point(crop.cols - (abs(lipTop.x - lipBottom.x)), lipBottom.y));
 		Mat d6 = correct_perpective(crop, lipBottom, chinTip,
-				Point(crop.cols, chinTip.y));
-		Mat d7 = correct_perpective(crop, chinTip, bottomCenter, bottomRight);
+				Point(crop.cols - (abs(lipBottom.x - chinTip.x)), chinTip.y));
+		Mat d7 = correct_perpective(crop, chinTip, bottomCenter,
+				Point(crop.cols - (abs(chinTip.x - bottomCenter.x)),
+						bottomCenter.y));
 
 		for (int r = 0; r < crop.rows; r++) {
 			if (r < noseTop.y) {
@@ -590,7 +567,7 @@ int main() {
 				if (col < crop.cols * 0.5)
 					out2.at<uchar>(row, col) = out.at<uchar>(row + 1, -col);
 				else
-					out2.at<uchar>(row, col) = out.at<uchar>(row, col);
+					out2.at<uchar>(row, col) = out.at<uchar>(row, col - 1);
 			}
 		}
 
@@ -638,8 +615,6 @@ int main() {
 
 	printf("%s: %d face(s)\n", path, nfaces);
 	fflush(stdout);
-
-//    cv::imwrite("minimal2.bmp", img);
 	cv::waitKey(0);
 
 	return 0;
