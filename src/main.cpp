@@ -135,9 +135,9 @@ double get_mass_center(std::string const& name, Mat1b const& image) {
 		cv::line(hist_image, cv::Point(b, hist_height - height),
 				cv::Point(b, hist_height), cv::Scalar::all(255));
 		// mc
-		sum1 += b * height;
+		sum1 += b * (hist_height - height);
 		//printf("sum1=%d\n", sum1);
-		sum2 += height;
+		sum2 += hist_height - height;
 		//printf("sum2=%d\n", sum2);
 	}
 	printf("sum1=%f / sum2=%f | mc = %f\n", sum1, sum2, sum1 / sum2);
@@ -230,7 +230,7 @@ int main() {
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	static const char* path = "elizabeth-hurley-diamond-face.jpg";
+	static const char* path = "2013-11-25-173723.jpg";
 
 	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
@@ -267,21 +267,6 @@ int main() {
 				cvRound(landmarks[56 * 2 + 1]));
 		Point CTipOfChin = Point(cvRound(landmarks[6 * 2]),
 				cvRound(landmarks[6 * 2 + 1]));
-
-		/*        // draw a line between the two eyes
-		 line(img, RPupil, LPupil, cvScalar(255,0,255), 1);
-
-		 // draw a line between the right eye pupil and the nose tip
-		 line(img, RPupil, CNoseTip, cvScalar(255,0,255), 1);
-
-		 // draw a line between the left eye pupil and the nose tip
-		 line(img, LPupil, CNoseTip, cvScalar(255,0,255), 1);
-
-		 // draw a line between the right eye pupil and the nose tip
-		 line(img, LEyebrowInner, CNoseTip, cvScalar(255,0,255), 1);
-
-		 // draw a line between the left eye pupil and the nose tip
-		 line(img, CNoseBase, CTipOfChin, cvScalar(255,0,255), 1);*/
 
 		// roll
 		double theta = atan2((double) LPupil.y - RPupil.y, LPupil.x - RPupil.x); //deg = * 180 / CV_PI;
@@ -418,10 +403,8 @@ int main() {
 
 		//int variance = gsl_stats_variance(mc, 0, 8);
 
-		double variance;
-
 		// VARIANCIA | ver http://www.gnu.org/software/gsl/manual/html_node/Example-statistical-programs.html
-		variance = gsl_stats_mean(mc, 1, 5);
+		double variance = gsl_stats_mean(mc, 1, 5);
 
 		printf("The dataset is %g, %g, %g, %g, %g, %g, %g, %g\n", mc[0], mc[1],
 				mc[2], mc[3], mc[4], mc[5], mc[6], mc[7]);
@@ -460,9 +443,9 @@ int main() {
 		int x1, y1, x2, y2;
 		try {
 			x1 = roi_vector.at(1).x - 5;
-			y1 = roi_vector.at(23).y - 50;
+			y1 = roi_vector.at(23).y - 40;
 			x2 = roi_vector.at(13).x + 5;
-			y2 = roi_vector.at(7).y + 10;
+			y2 = roi_vector.at(7).y + 5;
 		} catch (const std::out_of_range& oor) {
 			std::cerr << "Unable to crop image! Reason: Out of Range error: "
 					<< oor.what() << '\n';
@@ -526,37 +509,37 @@ int main() {
 		cv::Mat out(crop.rows, crop.cols, CV_8U);
 		cv::Mat out2(crop.rows, crop.cols, CV_8U);
 
-		Mat d1 = correct_perpective(crop, topCenter, noseTop,
-				Point(crop.cols - (abs(topCenter.x - noseTop.x)), noseTop.y));
-		Mat d2 = correct_perpective(crop, noseTop, noseTip,
+		Mat band1 = correct_perpective(crop, topCenter, noseTop,
+				Point(crop.cols, noseTop.y));
+		Mat band2 = correct_perpective(crop, noseTop, noseTip,
 				Point(crop.cols - (abs(noseTop.x - noseTip.x)), noseTip.y));
-		Mat d3 = correct_perpective(crop, noseTip, noseBase,
+		Mat band3 = correct_perpective(crop, noseTip, noseBase,
 				Point(crop.cols - (abs(noseTip.x - noseBase.x)), noseBase.y));
-		Mat d4 = correct_perpective(crop, noseBase, lipTop,
-				Point(crop.cols - (abs(noseBase.x - lipTop.x)), lipTop.y));
-		Mat d5 = correct_perpective(crop, lipTop, lipBottom,
+		Mat band4 = correct_perpective(crop, noseBase, lipTop,
+				Point(crop.cols - (abs(noseBase.x - lipTop.x) + 2), lipTop.y));
+		Mat band5 = correct_perpective(crop, lipTop, lipBottom,
 				Point(crop.cols - (abs(lipTop.x - lipBottom.x)), lipBottom.y));
-		Mat d6 = correct_perpective(crop, lipBottom, chinTip,
+		Mat band6 = correct_perpective(crop, lipBottom, chinTip,
 				Point(crop.cols - (abs(lipBottom.x - chinTip.x)), chinTip.y));
-		Mat d7 = correct_perpective(crop, chinTip, bottomCenter,
+		Mat band7 = correct_perpective(crop, chinTip, bottomCenter,
 				Point(crop.cols - (abs(chinTip.x - bottomCenter.x)),
 						bottomCenter.y));
 
 		for (int r = 0; r < crop.rows; r++) {
 			if (r < noseTop.y) {
-				d1.row(r).copyTo(out.row(r));
+				band1.row(r).copyTo(out.row(r));
 			} else if (r < noseTip.y) {
-				d2.row(r).copyTo(out.row(r));
+				band2.row(r).copyTo(out.row(r));
 			} else if (r < noseBase.y) {
-				d3.row(r).copyTo(out.row(r));
+				band3.row(r).copyTo(out.row(r));
 			} else if (r < lipTop.y) {
-				d4.row(r).copyTo(out.row(r));
+				band4.row(r).copyTo(out.row(r));
 			} else if (r < lipBottom.y) {
-				d5.row(r).copyTo(out.row(r));
+				band5.row(r).copyTo(out.row(r));
 			} else if (r < chinTip.y) {
-				d6.row(r).copyTo(out.row(r));
+				band6.row(r).copyTo(out.row(r));
 			} else {
-				d7.row(r).copyTo(out.row(r));
+				band7.row(r).copyTo(out.row(r));
 			}
 		}
 
@@ -573,26 +556,12 @@ int main() {
 
 		std::vector<Point> stasm_vector2 = get_new_stasm_pts(out2, 68);
 
-//		circle(out2, midpoint(stasm_vector2.at(24).x, stasm_vector2.at(24).y, stasm_vector2.at(18).x, stasm_vector2.at(18).y), 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(67), 2, Scalar(0, 0, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(41), 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(51), 2, Scalar(0, 0, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(57), 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(7), 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(32), 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(33), 2, Scalar(0, 0, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(34), 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(35), 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(36), 2, Scalar(0, 255, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(13), 2, Scalar(0, 0, 255), thickness, lineType);
-//		circle(out2, stasm_vector2.at(16), 2, Scalar(0, 255, 255), thickness, lineType);
-
 		imshow("Mirror right to left", out2);
 
 		// 4.(f) função sqi
 		Mat illumNorn;
 
-//		IplImage copy = out2;
+		IplImage copy = out2;
 
 //		illumNorn = Mat(SQI(&copy));
 
