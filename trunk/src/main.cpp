@@ -81,22 +81,48 @@ Mat correct_perpective(Mat src, Point pt1, Point pt2, Point pt3) {
 	return warp_dst;
 }
 
-/* For an array value, or most values of x, citizen_sig will return the resulting
- * value for that x. citizen_sig does not draw the resulting curve for several
- * values of x.  citizen_sig also returns EDOM if x is outside its domain.
- * From http://cboard.cprogramming.com/contests-board/91606-fastest-sigmoid-function-2.html
+/**
+ * Sigmoid function.
  */
 double sigmoid(double x) {
 
-	double square_of_x, div;
+	double s = 0.0;
+	s = 1.0 / (1.0 + exp(-x / 160));
 
-	errno = 0;
-	square_of_x = pow(x, 2.);
-	div = sqrt(square_of_x + 1.);
-	if (errno == EDOM)
-		return EDOM;
-	else
-		return x / div;
+	return s;
+}
+
+/**
+ * Calculate mean. http://www.softwareandfinance.com/CPP/MeanVarianceStdDevi.html
+ */
+double calculateMean(double value[])
+{
+    double max = 8;
+
+    double sum = 0;
+    for(int i = 0; i < max; i++)
+        sum += value[i];
+
+    return (sum / max);
+}
+
+/**
+ * Calculate Variance. From http://www.softwareandfinance.com/CPP/MeanVarianceStdDevi.html
+ */
+double calculateStd(double value[])
+{
+    int max = 8;
+    double mean;
+    mean = calculateMean(value);
+
+    double temp = 0;
+    for(int i = 0; i < max; i++)
+    {
+         temp += (value[i] - mean) * (value[i] - mean) ;
+    }
+    double deviance = temp / max;
+
+    return sqrt(deviance);
 }
 
 /**
@@ -230,7 +256,7 @@ int main() {
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	static const char* path = "2013-11-25-173723.jpg";
+	static const char* path = "2013-11-25-174055.jpg";
 
 	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
@@ -387,37 +413,20 @@ int main() {
 		double mc_w7 = (double) get_mass_center("h7", subMatPt7);
 		double mc_w8 = (double) get_mass_center("h8", subMatPt8);
 
-		/*vector<int> vector_mc;
-
-		 vector_mc.push_back(mc_w1);
-		 vector_mc.push_back(mc_w2);
-		 vector_mc.push_back(mc_w3);
-		 vector_mc.push_back(mc_w4);
-		 vector_mc.push_back(mc_w5);
-		 vector_mc.push_back(mc_w6);
-		 vector_mc.push_back(mc_w7);
-		 vector_mc.push_back(mc_w8);*/
-
 		double mc[8] =
 				{ mc_w1, mc_w2, mc_w3, mc_w4, mc_w5, mc_w6, mc_w7, mc_w8 };
-
-		//int variance = gsl_stats_variance(mc, 0, 8);
-
-		// VARIANCIA | ver http://www.gnu.org/software/gsl/manual/html_node/Example-statistical-programs.html
-		double variance = gsl_stats_mean(mc, 1, 5);
-
 		printf("The dataset is %g, %g, %g, %g, %g, %g, %g, %g\n", mc[0], mc[1],
 				mc[2], mc[3], mc[4], mc[5], mc[6], mc[7]);
 
-		printf("variance %f: \n", variance);
 
-		// SI = 1 − F (std(mc))
+		double std = calculateStd(mc);
+		printf("Std deviation = %f: \n", std);
 
-		double si = 1 - sigmoid(variance); // MELHORAR COM CPPNETLIB?
+		double si = 1 - sigmoid(std);
 
-		printf("sigmoid %f: \n", sigmoid(variance));
+		printf("Sigmoid = %f: \n", sigmoid(std));
 
-		printf("si %f: \n", si);
+		printf("SI = %f: \n", si);
 
 		imshow("Original img", img);
 
@@ -563,7 +572,7 @@ int main() {
 
 		IplImage copy = out2;
 
-//		illumNorn = Mat(SQI(&copy));
+		illumNorn = Mat(SQI(&copy));
 
 		/*Mat imageSQItest;
 		 imageSQItest = imread("Screenshot - 09-11-2013 - 16:20:17.png", CV_LOAD_IMAGE_GRAYSCALE);   // Read the file
@@ -578,7 +587,7 @@ int main() {
 
 		 illumNorn = Mat(SQI(&copy));*/
 
-//		imshow("illumination norm with SQI", illumNorn);
+		imshow("illumination norm with SQI", illumNorn);
 		nfaces++;
 	}
 
