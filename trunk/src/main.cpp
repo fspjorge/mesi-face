@@ -59,7 +59,7 @@ Mat rotateImage(const Mat& source, double angle) {
  * |  -
  * 2-
  */
-Mat correct_perpective(Mat src, Point pt1, Point pt2, Point pt3) {
+Mat correctPerpective(Mat src, Point pt1, Point pt2, Point pt3) {
 	Mat warp_dst;
 	Size size(src.cols, src.rows);
 	Point2f src_vertices[3];
@@ -95,41 +95,38 @@ double sigmoid(double x) {
 /**
  * Calculate mean. http://www.softwareandfinance.com/CPP/MeanVarianceStdDevi.html
  */
-double calculateMean(double value[])
-{
-    double max = 8;
+double calculateMean(double value[]) {
+	double max = 8;
 
-    double sum = 0;
-    for(int i = 0; i < max; i++)
-        sum += value[i];
+	double sum = 0;
+	for (int i = 0; i < max; i++)
+		sum += value[i];
 
-    return (sum / max);
+	return (sum / max);
 }
 
 /**
  * Calculate Variance. From http://www.softwareandfinance.com/CPP/MeanVarianceStdDevi.html
  */
-double calculateStd(double value[])
-{
-    int max = 8;
-    double mean;
-    mean = calculateMean(value);
+double calculateStd(double value[]) {
+	int max = 8;
+	double mean;
+	mean = calculateMean(value);
 
-    double temp = 0;
-    for(int i = 0; i < max; i++)
-    {
-         temp += (value[i] - mean) * (value[i] - mean) ;
-    }
-    double deviance = temp / max;
+	double temp = 0;
+	for (int i = 0; i < max; i++) {
+		temp += (value[i] - mean) * (value[i] - mean);
+	}
+	double deviance = temp / max;
 
-    return sqrt(deviance);
+	return sqrt(deviance);
 }
 
 /**
  * Returns the value of the center of mass for each submatrix.
  * From http://stackoverflow.com/questions/15771512/compare-histograms-of-grayscale-images-in-opencv
  */
-double get_mass_center(std::string const& name, Mat1b const& image) {
+double getMassCenter(std::string const& name, Mat1b const& image) {
 	// Set histogram bins count
 	int bins = 256;
 	int histSize[] = { bins };
@@ -193,7 +190,7 @@ Point midpoint(double x1, double y1, double x2, double y2) {
 /**
  * Get STASM points array from image.
  */
-vector<Point> get_stasm_pts(char* imgPath, int shape) {
+vector<Point> getStasmPts(char* imgPath, int shape) {
 
 	vector<Point> pts_array;
 
@@ -236,13 +233,13 @@ vector<Point> get_stasm_pts(char* imgPath, int shape) {
 }
 
 /**
- * Corrects the STASM points coordinates caused by the rotation of the original image.
+ * Corrects the STASM points coordinates caused by the rotation and horizontal flip on the original image.
  */
-vector<Point> get_new_stasm_pts(Mat src, int shape) {
+vector<Point> getNewStasmPts(Mat src, int shape) {
 	imwrite("tmp.jpg", src);
 	char *tmp = new char[10];
 	strcpy(tmp, "tmp.jpg");
-	vector<Point> pts = get_stasm_pts(tmp, shape);
+	vector<Point> pts = getStasmPts(tmp, shape);
 
 	if (remove("tmp.jpg") != 0)
 		perror("Error deleting file tmp.jpg");
@@ -252,11 +249,67 @@ vector<Point> get_new_stasm_pts(Mat src, int shape) {
 	return pts;
 }
 
+/**
+ * Calculates the average value of the pixels of a matrix.
+ */
+double pixelsMean(Mat img) {
+	vector<Mat> channels;
+	split(img, channels);
+	Scalar m = mean(channels[0]);
+
+	return m[0];
+}
+
+/**
+ * Calculates the correlation between two cv::Mat.
+ */
+double localCorrelation(Mat rA, Mat rB) {
+
+	double rAMean = pixelsMean(rA);
+	double rBMean = pixelsMean(rB);
+
+	double sum1 = 0.0;
+	double sum2 = 0.0;
+	double sum3 = 0.0;
+
+	for (int j = 0; j < rA.rows; j++) {
+		for (int i = 0; i < rA.cols; i++) {
+
+			sum1 += (rA.at<uchar>(j, i) - rAMean) * (rB.at<uchar>(j, i) - rBMean);
+			sum2 += pow(rA.at<uchar>(j, i) - rAMean, 2.0);
+			sum3 += pow(rB.at<uchar>(j, i) - rBMean, 2.0);
+		}
+	}
+
+	double corr = sum1 / (sqrt(sum2 * sum3));
+	cout << "corrLocal = " << corr << endl;
+
+	return corr;
+}
+
+/**
+ * Soma dos máximos das subregiões.
+ */
+double globalCorrelation(Mat A, Mat B, Point pt) {
+	double SumAB = 0.0;
+
+//	int width = abs(pt1.x - pt2.x); // u
+//	int height = abs(pt1.y - pt2.y); // v
+
+//	for (int i = 0; i < A.rows; i + 8) {
+//		for (int j = 0; j < A.cols; j + 8) {
+//			SumAB += localCorrelation(A, B, pt, Point(pt.x + i, pt.y + j));
+//		}
+//	}
+
+	return SumAB;
+}
+
 int main() {
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	static const char* path = "2013-11-25-174055.jpg";
+	static const char* path = "data/testface.jpg";
 
 	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
@@ -404,20 +457,19 @@ int main() {
 
 		// histograms
 		// ver http://docs.opencv.org/doc/tutorials/imgproc/histograms/histogram_calculation/histogram_calculation.html
-		double mc_w1 = (double) get_mass_center("h1", subMatPt1);
-		double mc_w2 = (double) get_mass_center("h2", subMatPt2);
-		double mc_w3 = (double) get_mass_center("h3", subMatPt3);
-		double mc_w4 = (double) get_mass_center("h4", subMatPt4);
-		double mc_w5 = (double) get_mass_center("h5", subMatPt5);
-		double mc_w6 = (double) get_mass_center("h6", subMatPt6);
-		double mc_w7 = (double) get_mass_center("h7", subMatPt7);
-		double mc_w8 = (double) get_mass_center("h8", subMatPt8);
+		double mc_w1 = (double) getMassCenter("h1", subMatPt1);
+		double mc_w2 = (double) getMassCenter("h2", subMatPt2);
+		double mc_w3 = (double) getMassCenter("h3", subMatPt3);
+		double mc_w4 = (double) getMassCenter("h4", subMatPt4);
+		double mc_w5 = (double) getMassCenter("h5", subMatPt5);
+		double mc_w6 = (double) getMassCenter("h6", subMatPt6);
+		double mc_w7 = (double) getMassCenter("h7", subMatPt7);
+		double mc_w8 = (double) getMassCenter("h8", subMatPt8);
 
 		double mc[8] =
 				{ mc_w1, mc_w2, mc_w3, mc_w4, mc_w5, mc_w6, mc_w7, mc_w8 };
 		printf("The dataset is %g, %g, %g, %g, %g, %g, %g, %g\n", mc[0], mc[1],
 				mc[2], mc[3], mc[4], mc[5], mc[6], mc[7]);
-
 
 		double std = calculateStd(mc);
 		printf("Std deviation = %f: \n", std);
@@ -442,11 +494,8 @@ int main() {
 		if (gsl_fcmp(dl, dr, DBL_EPSILON) > 0) { // x = y returns 0; if x < y returns -1; x > y returns +1;
 			flip(img, img, 1);
 		}
-//		cv::imshow("horizontal flip", img);
-//		cv::waitKey(0);
 
-		// imagem rodada theta graus, nova verificação das coordenadas dos pontos devido à rotação
-		std::vector<Point> roi_vector = get_new_stasm_pts(img, 68);
+		std::vector<Point> roi_vector = getNewStasmPts(img, 68);
 
 		// image crop for better results
 		int x1, y1, x2, y2;
@@ -464,10 +513,8 @@ int main() {
 		int height = y2 - y1;
 		Mat crop = img(Rect(x1, y1, width, height));
 
-		imshow("crop", crop);
-
 		// 4. (c) stretching
-		std::vector<Point> stasm_vector = get_new_stasm_pts(crop, 68);
+		std::vector<Point> stasm_vector = getNewStasmPts(crop, 68);
 
 		Point noseTop = midpoint(stasm_vector.at(24).x, stasm_vector.at(24).y,
 				stasm_vector.at(18).x, stasm_vector.at(18).y);
@@ -478,22 +525,22 @@ int main() {
 		Point lipBottom = stasm_vector.at(57);
 		Point chinTip = stasm_vector.at(7);
 		Point bottomCenter = Point(chinTip.x, crop.rows);
-		Point bottomRight = Point(crop.cols, crop.rows);
-		Point topRight = Point(crop.cols, 0);
+//		Point bottomRight = Point(crop.cols, crop.rows);
+//		Point topRight = Point(crop.cols, 0);
+//
+//		int thickness = -1;
+//		int lineType = 8;
 
-		int thickness = -1;
-		int lineType = 8;
-
-		circle(crop, topCenter, 2, Scalar(0, 255, 255), thickness, lineType);
-		circle(crop, noseTop, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(crop, noseTip, 2, Scalar(0, 255, 255), thickness, lineType);
-		circle(crop, noseBase, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(crop, lipTop, 2, Scalar(0, 255, 255), thickness, lineType);
-		circle(crop, lipBottom, 2, Scalar(0, 255, 255), thickness, lineType);
-		circle(crop, chinTip, 2, Scalar(0, 255, 255), thickness, lineType);
-		circle(crop, bottomCenter, 2, Scalar(0, 0, 255), thickness, lineType);
-		circle(crop, bottomRight, 2, Scalar(0, 255, 255), thickness, lineType);
-		circle(crop, topRight, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, topCenter, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, noseTop, 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(crop, noseTip, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, noseBase, 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(crop, lipTop, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, lipBottom, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, chinTip, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, bottomCenter, 2, Scalar(0, 0, 255), thickness, lineType);
+//		circle(crop, bottomRight, 2, Scalar(0, 255, 255), thickness, lineType);
+//		circle(crop, topRight, 2, Scalar(0, 255, 255), thickness, lineType);
 //
 //		line(crop, topCenter, noseTop, 255, 1, 8, 0);
 //		line(crop, noseTop, noseTip, 255, 1, 8, 0);
@@ -518,19 +565,19 @@ int main() {
 		cv::Mat out(crop.rows, crop.cols, CV_8U);
 		cv::Mat out2(crop.rows, crop.cols, CV_8U);
 
-		Mat band1 = correct_perpective(crop, topCenter, noseTop,
+		Mat band1 = correctPerpective(crop, topCenter, noseTop,
 				Point(crop.cols, noseTop.y));
-		Mat band2 = correct_perpective(crop, noseTop, noseTip,
+		Mat band2 = correctPerpective(crop, noseTop, noseTip,
 				Point(crop.cols - (abs(noseTop.x - noseTip.x)), noseTip.y));
-		Mat band3 = correct_perpective(crop, noseTip, noseBase,
+		Mat band3 = correctPerpective(crop, noseTip, noseBase,
 				Point(crop.cols - (abs(noseTip.x - noseBase.x)), noseBase.y));
-		Mat band4 = correct_perpective(crop, noseBase, lipTop,
+		Mat band4 = correctPerpective(crop, noseBase, lipTop,
 				Point(crop.cols - (abs(noseBase.x - lipTop.x) + 2), lipTop.y));
-		Mat band5 = correct_perpective(crop, lipTop, lipBottom,
+		Mat band5 = correctPerpective(crop, lipTop, lipBottom,
 				Point(crop.cols - (abs(lipTop.x - lipBottom.x)), lipBottom.y));
-		Mat band6 = correct_perpective(crop, lipBottom, chinTip,
+		Mat band6 = correctPerpective(crop, lipBottom, chinTip,
 				Point(crop.cols - (abs(lipBottom.x - chinTip.x)), chinTip.y));
-		Mat band7 = correct_perpective(crop, chinTip, bottomCenter,
+		Mat band7 = correctPerpective(crop, chinTip, bottomCenter,
 				Point(crop.cols - (abs(chinTip.x - bottomCenter.x)),
 						bottomCenter.y));
 
@@ -563,7 +610,7 @@ int main() {
 			}
 		}
 
-		std::vector<Point> stasm_vector2 = get_new_stasm_pts(out2, 68);
+		std::vector<Point> stasm_vector2 = getNewStasmPts(out2, 68);
 
 		imshow("Mirror right to left", out2);
 
@@ -573,6 +620,8 @@ int main() {
 		IplImage copy = out2;
 
 		illumNorn = Mat(SQI(&copy));
+
+		double corr1 = localCorrelation(crop, out2);
 
 		/*Mat imageSQItest;
 		 imageSQItest = imread("Screenshot - 09-11-2013 - 16:20:17.png", CV_LOAD_IMAGE_GRAYSCALE);   // Read the file
@@ -588,7 +637,6 @@ int main() {
 		 illumNorn = Mat(SQI(&copy));*/
 
 		imshow("illumination norm with SQI", illumNorn);
-		nfaces++;
 	}
 
 	printf("%s: %d face(s)\n", path, nfaces);
