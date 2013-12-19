@@ -260,11 +260,13 @@ double pixelsMean(Mat img) {
 	return m[0];
 }
 
+/**
+ * Divides a region in 8x8 square sub-regions and puts them in a vector.
+ * Returns a vector of sub-regions (cv::Mat).
+ */
 vector<Mat> divideIntoSubRegions(Mat region) {
 
 	vector<Mat> subRegions;
-
-	cout << "The region size is " << region.cols << "x" << region.rows << endl;
 
 	for (int i = 0; i < region.cols; i += 8) {
 		for (int j = 0; j < region.rows; j += 8) {
@@ -277,7 +279,7 @@ vector<Mat> divideIntoSubRegions(Mat region) {
 				}
 				else
 				{
-					cout << "O ponto (" << i << ", " << j << " está fora da região A " << endl;
+					cout << "Point (" << i << ", " << j << " is out of the main region." << endl;
 				}
 			} catch (cv::Exception& e) {
 				cout << e.msg << endl;
@@ -285,14 +287,14 @@ vector<Mat> divideIntoSubRegions(Mat region) {
 		}
 	}
 
-	cout << "The result is a total of " << subRegions.size()
+	cout << "Dividing a region with size " << region.cols << "x" << region.rows << " results in a total of " << subRegions.size()
 			<< " sub-regions, each one with size " << subRegions.at(0).cols
 			<< "x" << subRegions.at(0).rows << endl;
 
-	for(int y = 0; y < subRegions.size(); y++)
-	{
-		cout << "O quadrado " << y << " tem tamanho "<< subRegions.at(y).cols << "x" << subRegions.at(y).rows << endl;
-	}
+//	for(int y = 0; y < subRegions.size(); y++)
+//	{
+//		cout << "Square " << y << " has size "<< subRegions.at(y).cols << "x" << subRegions.at(y).rows << " e tem localização " << subRegions.at(y). << endl;
+//	}
 
 	// para o ponto da matriz A p=(x,y) testar as hipoteses -d até d, ou seja p_=(x + i, y + j), com i = −d, . . . , d e	j = −d, . . . , d.
 
@@ -328,10 +330,40 @@ double localCorrelation(Mat rA, Mat rB) {
 }
 
 /**
- * Soma dos máximos das subregiões.
+ * Soma dos máximos das subregiões (WORK IN PROGRESS).
  */
-double globalCorrelation(Mat A, Mat B, Point pt) {
+double globalCorrelation(Mat A, Mat B) {
 	double SumAB = 0.0;
+
+	resize(A, B, Size(A.size), 0, 0, INTER_CUBIC);
+
+	vector<Mat> subRegionsOfA = divideIntoSubRegions(A);
+	vector<Mat> subRegionsOfB = divideIntoSubRegions(B);
+
+	int regionsPerLine = A.cols % 8;
+
+	for(int i = 0; i < subRegionsOfA; i++)
+	{
+		if(i < regionsPerLine)
+		{
+			localCorrelation(subRegionsOfA.at(0), subRegionsOfB.at(0));
+		}
+		else if(A.cols % i == regionsPerLine) // ???
+		{
+			//compara com o primeiro da linha anterior
+			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
+			//compara com o próprio
+			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
+		}
+		else
+		{
+			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
+			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i - 1));
+			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(regionsPerLine));
+			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(regionsPerLine + 1));
+		}
+	}
+
 
 //	int width = abs(pt1.x - pt2.x); // u
 //	int height = abs(pt1.y - pt2.y); // v
@@ -341,6 +373,8 @@ double globalCorrelation(Mat A, Mat B, Point pt) {
 //			SumAB += localCorrelation(A, B, pt, Point(pt.x + i, pt.y + j));
 //		}
 //	}
+
+
 
 	return SumAB;
 }
