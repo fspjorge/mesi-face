@@ -260,13 +260,52 @@ double pixelsMean(Mat img) {
 	return m[0];
 }
 
+vector<Mat> divideIntoSubRegions(Mat region) {
+
+	vector<Mat> subRegions;
+
+	cout << "The region size is " << region.cols << "x" << region.rows << endl;
+
+	for (int i = 0; i < region.cols; i += 8) {
+		for (int j = 0; j < region.rows; j += 8) {
+
+			try {
+				if (region.at<uchar>(i, j) >= 0) {
+					Mat subRegion = region(Rect(i, j, 8, 8));
+					subRegions.push_back(subRegion);
+					cout << "i = " << i << " j = " << j << endl;
+				}
+				else
+				{
+					cout << "O ponto (" << i << ", " << j << " está fora da região A " << endl;
+				}
+			} catch (cv::Exception& e) {
+				cout << e.msg << endl;
+			}
+		}
+	}
+
+	cout << "The result is a total of " << subRegions.size()
+			<< " sub-regions, each one with size " << subRegions.at(0).cols
+			<< "x" << subRegions.at(0).rows << endl;
+
+	for(int y = 0; y < subRegions.size(); y++)
+	{
+		cout << "O quadrado " << y << " tem tamanho "<< subRegions.at(y).cols << "x" << subRegions.at(y).rows << endl;
+	}
+
+	// para o ponto da matriz A p=(x,y) testar as hipoteses -d até d, ou seja p_=(x + i, y + j), com i = −d, . . . , d e	j = −d, . . . , d.
+
+	return subRegions;
+}
+
 /**
  * Calculates the correlation between two cv::Mat.
  */
 double localCorrelation(Mat rA, Mat rB) {
 
-	double rAMean = pixelsMean(rA);
-	double rBMean = pixelsMean(rB);
+	double rAPixMean = pixelsMean(rA);
+	double rBPixMean = pixelsMean(rB);
 
 	double sum1 = 0.0;
 	double sum2 = 0.0;
@@ -275,9 +314,10 @@ double localCorrelation(Mat rA, Mat rB) {
 	for (int j = 0; j < rA.rows; j++) {
 		for (int i = 0; i < rA.cols; i++) {
 
-			sum1 += (rA.at<uchar>(j, i) - rAMean) * (rB.at<uchar>(j, i) - rBMean);
-			sum2 += pow(rA.at<uchar>(j, i) - rAMean, 2.0);
-			sum3 += pow(rB.at<uchar>(j, i) - rBMean, 2.0);
+			sum1 += (rA.at<uchar>(j, i) - rAPixMean)
+					* (rB.at<uchar>(j, i) - rBPixMean);
+			sum2 += pow(rA.at<uchar>(j, i) - rAPixMean, 2.0);
+			sum3 += pow(rB.at<uchar>(j, i) - rBPixMean, 2.0);
 		}
 	}
 
@@ -306,10 +346,13 @@ double globalCorrelation(Mat A, Mat B, Point pt) {
 }
 
 int main() {
+
+	clock_t time = clock();
+
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	static const char* path = "data/testface.jpg";
+	static const char* path = "2013-11-18-173422.jpg";
 
 	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
@@ -621,23 +664,20 @@ int main() {
 
 		illumNorn = Mat(SQI(&copy));
 
-		double corr1 = localCorrelation(crop, out2);
+		localCorrelation(out2, out2);
 
-		/*Mat imageSQItest;
-		 imageSQItest = imread("Screenshot - 09-11-2013 - 16:20:17.png", CV_LOAD_IMAGE_GRAYSCALE);   // Read the file
-
-		 if(! imageSQItest.data )                              // Check for invalid input
-		 {
-		 cout <<  "Could not open or find the image" << std::endl ;
-		 return -1;
-		 }
-
-		 IplImage copy = imageSQItest;
-
-		 illumNorn = Mat(SQI(&copy));*/
+		divideIntoSubRegions(out2);
 
 		imshow("illumination norm with SQI", illumNorn);
+
+		nfaces++;
 	}
+
+	time = clock() - time;
+
+	int ms = double(time) / CLOCKS_PER_SEC * 1000;
+
+	cout << "Elapsed time is " << ms << " milliseconds" << endl;
 
 	printf("%s: %d face(s)\n", path, nfaces);
 	fflush(stdout);
