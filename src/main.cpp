@@ -335,23 +335,34 @@ double localCorrelation(Mat rA, Mat rB) {
 double globalCorrelation(Mat A, Mat B) {
 	double SumAB = 0.0;
 
-	resize(A, B, Size(A.size), 0, 0, INTER_CUBIC);
+	cv::resize(A, B, A.size(), 0, 0, cv::INTER_CUBIC);
 
 	vector<Mat> subRegionsOfA = divideIntoSubRegions(A);
 	vector<Mat> subRegionsOfB = divideIntoSubRegions(B);
 
-	int regionsPerLine = A.cols % 8;
+	cout << "A região A tem " << A.rows << " colunas e " << A.cols << " colunas" << endl;
+	cout << "A região B tem " << B.rows << " colunas e " << B.cols << " colunas" << endl;
 
-	for(int i = 0; i < subRegionsOfA; i++)
+	int regionsPerLine = div(A.cols, 8).quot;
+
+	cout << "regionsPerLine = " << regionsPerLine << endl;
+
+	for(int i = 0; i < subRegionsOfA.size(); i++)
 	{
-		if(i < regionsPerLine)
+
+		if(i == 0)
 		{
-			localCorrelation(subRegionsOfA.at(0), subRegionsOfB.at(0));
+			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
 		}
-		else if(A.cols % i == regionsPerLine) // ???
+		else if(i > 0 && i < regionsPerLine) //
+		{
+			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
+			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i - 1));
+		}
+		else if(i%regionsPerLine == 0) // ???
 		{
 			//compara com o primeiro da linha anterior
-			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
+			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i-regionsPerLine));
 			//compara com o próprio
 			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
 		}
@@ -372,7 +383,6 @@ double globalCorrelation(Mat A, Mat B) {
 //		for (int j = 0; j < A.cols; j + 8) {
 //			SumAB += localCorrelation(A, B, pt, Point(pt.x + i, pt.y + j));
 //		}
-//	}
 
 
 
@@ -701,6 +711,8 @@ int main() {
 		localCorrelation(out2, out2);
 
 		divideIntoSubRegions(out2);
+
+		globalCorrelation(out2, out2);
 
 		imshow("illumination norm with SQI", illumNorn);
 
