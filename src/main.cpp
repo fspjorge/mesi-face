@@ -375,7 +375,7 @@ double globalCorrelation(Mat A, Mat B) {
 			localCorrelation(subRegionsOfA.at(i),
 					subRegionsOfB.at(i - regionsPerLine));
 			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
-		} else {
+		} else{
 			/**
 			 * ______
 			 * |__|__|
@@ -386,18 +386,18 @@ double globalCorrelation(Mat A, Mat B) {
 			cout << "i > 0 && i < regionsPerLine " << endl;
 			cout << "A comparar a região " << i << " com a região i(" << i << ")" << endl;
 			cout << "A comparar a região " << i << " com a região i-1(" << (i - 1) << ")" << endl;
-			cout << "A comparar a região " << i << " com a região regionsPerLine(" << regionsPerLine << ")" << endl;
-			cout << "A comparar a região " << i << " com a região regionsPerLine+1(" << (regionsPerLine + 1) << ")" << endl;
+			cout << "A comparar a região " << i << " com a região i + regionsPerLine(" << i - regionsPerLine << ")" << endl;
+			cout << "A comparar a região " << i << " com a região i + regionsPerLine + 1 (" << (i - regionsPerLine + 1) << ")" << endl;
 
 			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
 			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i - 1));
 			localCorrelation(subRegionsOfA.at(i),
-					subRegionsOfB.at(regionsPerLine));
+					subRegionsOfB.at(i - regionsPerLine));
 			localCorrelation(subRegionsOfA.at(i),
-					subRegionsOfB.at(regionsPerLine + 1));
+					subRegionsOfB.at(i - regionsPerLine + 1));
 		}
-		waitKey(0);
 		count++;
+		cout << "count = " << count << endl;
 	}
 
 	return SumAB;
