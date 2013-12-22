@@ -267,19 +267,16 @@ double pixelsMean(Mat img) {
 vector<Mat> divideIntoSubRegions(Mat region) {
 
 	vector<Mat> subRegions;
+	int roiSize = 8;
 
-	for (int i = 0; i < region.cols; i += 8) {
-		for (int j = 0; j < region.rows; j += 8) {
+	for (int i = 0; i < region.cols/roiSize; ++i) {
+		for (int j = 0; j < region.rows/roiSize; ++j) {
 
 			try {
-				if (region.at<uchar>(i, j) >= 0) {
-					Mat subRegion = region(Rect(i, j, 8, 8));
+				if (region.at<uchar>(i, j) > 0) {
+					Mat subRegion = region(Rect(i, j, roiSize, roiSize));
 					subRegions.push_back(subRegion);
 					cout << "i = " << i << " j = " << j << endl;
-				}
-				else
-				{
-					cout << "Point (" << i << ", " << j << " is out of the main region." << endl;
 				}
 			} catch (cv::Exception& e) {
 				cout << e.msg << endl;
@@ -287,16 +284,10 @@ vector<Mat> divideIntoSubRegions(Mat region) {
 		}
 	}
 
-	cout << "Dividing a region with size " << region.cols << "x" << region.rows << " results in a total of " << subRegions.size()
+	cout << "Dividing a region with size " << region.cols << "x" << region.rows
+			<< " results in a total of " << subRegions.size()
 			<< " sub-regions, each one with size " << subRegions.at(0).cols
 			<< "x" << subRegions.at(0).rows << endl;
-
-//	for(int y = 0; y < subRegions.size(); y++)
-//	{
-//		cout << "Square " << y << " has size "<< subRegions.at(y).cols << "x" << subRegions.at(y).rows << " e tem localização " << subRegions.at(y). << endl;
-//	}
-
-	// para o ponto da matriz A p=(x,y) testar as hipoteses -d até d, ou seja p_=(x + i, y + j), com i = −d, . . . , d e	j = −d, . . . , d.
 
 	return subRegions;
 }
@@ -340,51 +331,74 @@ double globalCorrelation(Mat A, Mat B) {
 	vector<Mat> subRegionsOfA = divideIntoSubRegions(A);
 	vector<Mat> subRegionsOfB = divideIntoSubRegions(B);
 
-	cout << "A região A tem " << A.rows << " colunas e " << A.cols << " colunas" << endl;
-	cout << "A região B tem " << B.rows << " colunas e " << B.cols << " colunas" << endl;
-
-	int regionsPerLine = div(A.cols, 8).quot;
+	unsigned int regionsPerLine = div(A.cols, 8).quot;
 
 	cout << "regionsPerLine = " << regionsPerLine << endl;
 
-	for(int i = 0; i < subRegionsOfA.size(); i++)
-	{
+	int count = 0;
 
-		if(i == 0)
-		{
+	for (unsigned int i = 0; i < subRegionsOfA.size(); i++) {
+
+		if (i == 0) {
+			/**
+			 * ____
+			 * |__|
+			 *
+			 */
+			cout << "i = 0 " << endl;
+			cout << "A comparar a região i(" << i << ") com a região i(" << i << ")"<< endl;
 			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
-		}
-		else if(i > 0 && i < regionsPerLine) //
-		{
+		} else if (i > 0 && i < regionsPerLine) {
+
+			/**
+			 * ______
+			 * |__|__|
+			 *
+			 */
+			cout << "i > 0 && i < regionsPerLine " << endl;
+			cout << "A comparar a região i(" << i << ") com a região i(" << i << ")"<< endl;
+			cout << "A comparar a região i(" << i << ") com a região i(" << (i-1) << ")"<< endl;
+
 			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
 			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i - 1));
-		}
-		else if(i%regionsPerLine == 0) // ???
-		{
-			//compara com o primeiro da linha anterior
-			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i-regionsPerLine));
-			//compara com o próprio
+		} else if (i % regionsPerLine == 0) {
+			/**
+			 * ____
+			 * |__|
+			 * |__|
+			 *
+			 */
+			cout << "i > 0 && i < regionsPerLine " << endl;
+			cout << "A comparar a região i(" << i << ") com a região i(" << i << ")"<< endl;
+			cout << "A comparar a região i(" << i << ") com a região i-regionsPerLine(" << (i-regionsPerLine) << ")"<< endl;
+
+			localCorrelation(subRegionsOfA.at(i),
+					subRegionsOfB.at(i - regionsPerLine));
 			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
-		}
-		else
-		{
+		} else {
+			/**
+			 * ______
+			 * |__|__|
+			 * |__|__|
+			 *
+			 */
+
+			cout << "i > 0 && i < regionsPerLine " << endl;
+			cout << "A comparar a região " << i << " com a região i(" << i << ")" << endl;
+			cout << "A comparar a região " << i << " com a região i-1(" << (i - 1) << ")" << endl;
+			cout << "A comparar a região " << i << " com a região regionsPerLine(" << regionsPerLine << ")" << endl;
+			cout << "A comparar a região " << i << " com a região regionsPerLine+1(" << (regionsPerLine + 1) << ")" << endl;
+
 			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
 			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i - 1));
-			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(regionsPerLine));
-			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(regionsPerLine + 1));
+			localCorrelation(subRegionsOfA.at(i),
+					subRegionsOfB.at(regionsPerLine));
+			localCorrelation(subRegionsOfA.at(i),
+					subRegionsOfB.at(regionsPerLine + 1));
 		}
+		waitKey(0);
+		count++;
 	}
-
-
-//	int width = abs(pt1.x - pt2.x); // u
-//	int height = abs(pt1.y - pt2.y); // v
-
-//	for (int i = 0; i < A.rows; i + 8) {
-//		for (int j = 0; j < A.cols; j + 8) {
-//			SumAB += localCorrelation(A, B, pt, Point(pt.x + i, pt.y + j));
-//		}
-
-
 
 	return SumAB;
 }
