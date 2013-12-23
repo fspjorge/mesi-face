@@ -325,6 +325,7 @@ double localCorrelation(Mat rA, Mat rB) {
  */
 double globalCorrelation(Mat A, Mat B) {
 	double SumAB = 0.0;
+	vector<double> localMax;
 
 	cv::resize(A, B, A.size(), 0, 0, cv::INTER_CUBIC);
 
@@ -335,9 +336,8 @@ double globalCorrelation(Mat A, Mat B) {
 
 	cout << "regionsPerLine = " << regionsPerLine << endl;
 
-	int count = 0;
-
 	for (unsigned int i = 0; i < subRegionsOfA.size(); i++) {
+		localMax.clear();
 
 		if (i == 0) {
 			/**
@@ -347,7 +347,7 @@ double globalCorrelation(Mat A, Mat B) {
 			 */
 			cout << "i = 0 " << endl;
 			cout << "A comparar a região i(" << i << ") com a região i(" << i << ")"<< endl;
-			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
+			localMax.push_back(localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
 		} else if (i > 0 && i < regionsPerLine) {
 
 			/**
@@ -357,10 +357,9 @@ double globalCorrelation(Mat A, Mat B) {
 			 */
 			cout << "i > 0 && i < regionsPerLine " << endl;
 			cout << "A comparar a região i(" << i << ") com a região i(" << i << ")"<< endl;
+			localMax.push_back(localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
 			cout << "A comparar a região i(" << i << ") com a região i(" << (i-1) << ")"<< endl;
-
-			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
-			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i - 1));
+			localMax.push_back(localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i - 1)));
 		} else if (i % regionsPerLine == 0) {
 			/**
 			 * ____
@@ -369,12 +368,11 @@ double globalCorrelation(Mat A, Mat B) {
 			 *
 			 */
 			cout << "i > 0 && i < regionsPerLine " << endl;
-			cout << "A comparar a região i(" << i << ") com a região i(" << i << ")"<< endl;
 			cout << "A comparar a região i(" << i << ") com a região i-regionsPerLine(" << (i-regionsPerLine) << ")"<< endl;
-
-			localCorrelation(subRegionsOfA.at(i),
-					subRegionsOfB.at(i - regionsPerLine));
-			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
+			localMax.push_back(localCorrelation(subRegionsOfA.at(i),
+					subRegionsOfB.at(i - regionsPerLine)));
+			cout << "A comparar a região i(" << i << ") com a região i(" << i << ")"<< endl;
+			localMax.push_back(localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
 		} else{
 			/**
 			 * ______
@@ -384,20 +382,20 @@ double globalCorrelation(Mat A, Mat B) {
 			 */
 
 			cout << "i > 0 && i < regionsPerLine " << endl;
-			cout << "A comparar a região " << i << " com a região i(" << i << ")" << endl;
-			cout << "A comparar a região " << i << " com a região i-1(" << (i - 1) << ")" << endl;
-			cout << "A comparar a região " << i << " com a região i + regionsPerLine(" << i - regionsPerLine << ")" << endl;
-			cout << "A comparar a região " << i << " com a região i + regionsPerLine + 1 (" << (i - regionsPerLine + 1) << ")" << endl;
 
-			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i));
-			localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i - 1));
-			localCorrelation(subRegionsOfA.at(i),
-					subRegionsOfB.at(i - regionsPerLine));
-			localCorrelation(subRegionsOfA.at(i),
-					subRegionsOfB.at(i - regionsPerLine + 1));
+			cout << "A comparar a região " << i << " com a região i(" << i << ")" << endl;
+			localMax.push_back(localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
+			cout << "A comparar a região " << i << " com a região i-1(" << (i - 1) << ")" << endl;
+			localMax.push_back(localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i - 1)));
+			cout << "A comparar a região " << i << " com a região i - regionsPerLine(" << i - regionsPerLine << ")" << endl;
+			localMax.push_back(localCorrelation(subRegionsOfA.at(i),
+					subRegionsOfB.at(i - regionsPerLine)));
+			cout << "A comparar a região " << i << " com a região i - regionsPerLine + 1 (" << (i - regionsPerLine + 1) << ")" << endl;
+			localMax.push_back(localCorrelation(subRegionsOfA.at(i),
+					subRegionsOfB.at(i - regionsPerLine + 1)));
 		}
-		count++;
-		cout << "count = " << count << endl;
+		//somar máximos locais
+		SumAB += *max_element(localMax.begin(), localMax.end());;
 	}
 
 	return SumAB;
@@ -726,7 +724,7 @@ int main() {
 
 		divideIntoSubRegions(out2);
 
-		globalCorrelation(out2, out2);
+		cout << "globalCorr = " << globalCorrelation(out2, out2) << endl;
 
 		imshow("illumination norm with SQI", illumNorn);
 
