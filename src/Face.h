@@ -31,40 +31,59 @@
 using namespace cv;
 using namespace std;
 
-class Face
-{
-	private:
+class Face {
+private:
+	vector<Point> stasmPts;
+	Mat_<unsigned char> face;
+	double theta;
 
+	//libface lib functions
+	IplImage* Rgb2Gray(IplImage *src);
+	CvMat* IplImage2Mat(IplImage *inp_img);
+	IplImage* Mat2IplImage(CvMat *inp_mat, int type);
+	int Scale_Mat(CvMat *input, double scale);
+	CvMat* Weighted_Gaussian(CvMat *inp, CvMat *gaussian);
+	CvMat* Get_Mat(CvPoint a, int width, int height, IplImage *image);
+	CvMat* Conv_Weighted_Gaussian(IplImage *inp_img, CvMat *kernel);
+	CvMat* Gaussian(int size);
 
-	public:
-		Face() { } // private default constructor
-		//libface lib functions
-		IplImage* Rgb2Gray(IplImage *src);
-		CvMat* IplImage2Mat(IplImage *inp_img);
-		IplImage* Mat2IplImage(CvMat *inp_mat, int type);
-		int Scale_Mat(CvMat *input, double scale);
-		CvMat* Weighted_Gaussian(CvMat *inp, CvMat *gaussian);
-		CvMat* Get_Mat(CvPoint a, int width, int height, IplImage *image);
-		CvMat* Conv_Weighted_Gaussian(IplImage *inp_img, CvMat *kernel);
-		CvMat* Gaussian(int size);
-		IplImage* SQI(IplImage* inp);
+	//aux functions
+	double pixelsMean(Mat img);
+	vector<Mat> divideIntoSubRegions(Mat region);
+	double localCorrelation(Mat rA, Mat rB);
 
-		//FACE functions
-		Mat rotateImage(const Mat& source, double angle);
-		Mat correctPerpective(Mat src, Point pt1, Point pt2, Point pt3);
-		double sigmoid(double x);
-		double calculateMean(double value[]);
-		double calculateStd(double value[]);
-		double getMassCenter(std::string const& name, Mat1b const& image);
-		static void error(const char* s1, const char* s2);
-		Point midpoint(double x1, double y1, double x2, double y2);
-		vector<Point> getStasmPts(char* imgPath, int shape);
-		vector<Point> getNewStasmPts(Mat src, int shape);
-		double pixelsMean(Mat img);
-		vector<Mat> divideIntoSubRegions(Mat region);
-		double localCorrelation(Mat rA, Mat rB);
-		double globalCorrelation(Mat A, Mat B);
+public:
+	Face(char* imgPath);
+	//libface lib functions
+	IplImage* SQI(IplImage* inp);
 
+	//FACE functions
+	Mat rotateImage(const Mat& source, double angle);
+	Mat correctPerpective(Mat src, Point pt1, Point pt2, Point pt3);
+	double sigmoid(double x);
+	double calculateMean(double value[]);
+	double calculateStd(double value[]);
+	double getMassCenter(std::string const& name, Mat1b const& image);
+	static void error(const char* s1, const char* s2);
+	Point calcMidpoint(double x1, double y1, double x2, double y2);
+	vector<Point> getStasmPts(char* imgPath, int shape);
+	void moveStasmPts(double angle);
+	double globalCorrelation(Mat A, Mat B);
+	Point rotatePoint(Point pt, double angle);
+	vector<Point> getStasmPts();
+	double calcSp(Point LPupil, Point RPupil, Point LEyebrowInner, Point CNoseTip, Point CNoseBase, Point CTipOfChin);
+	Mat normalizePose(Mat face, Point LPupil, Point RPupil, Point LEyebrowInner, Point CNoseTip, Point CNoseBase, Point CTipOfChin);
+	const Mat_<unsigned char>& loadMat() const {
+		return face;
+	}
+
+	double getTheta() const {
+		return theta;
+	}
+
+	void setTheta(double theta) {
+		this->theta = theta;
+	}
 };
 
 #endif /* FACE_H_ */
