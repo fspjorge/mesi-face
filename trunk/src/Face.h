@@ -70,6 +70,7 @@ public:
 	void moveStasmPts(double angle);
 	double globalCorrelation(Mat A, Mat B);
 	Point rotatePoint(Point pt, double angle);
+	double angleBetweenTwoPoints(Point pt1, Point pt2);
 	vector<Point> getStasmPts();
 	double calcSp(Point LPupil, Point RPupil, Point LEyebrowInner, Point CNoseTip, Point CNoseBase, Point CTipOfChin);
 	Mat normalizePose(Mat face, Point LPupil, Point RPupil, Point LEyebrowInner, Point CNoseTip, Point CNoseBase, Point CTipOfChin);
