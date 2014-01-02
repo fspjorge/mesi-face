@@ -24,9 +24,6 @@ int main() {
 	Point CNoseBase = stasmPts.at(41);
 	Point CTipOfChin = stasmPts.at(7);
 
-	int thickness = 5;
-	int lineType = 8;
-
 	double sp = face.calcSp(LPupil, RPupil, LEyebrowInner, CNoseBase, CNoseBase, CTipOfChin);
 
 	// SI = 1 - F(std(mc))
@@ -47,8 +44,6 @@ int main() {
 	} catch (Exception & e) {
 		cout << e.msg << endl;
 	}
-
-	imshow("", img);
 
 	int length;
 
@@ -128,12 +123,7 @@ int main() {
 
 	Mat crop = face.normalizePose(img, LPupil, RPupil, LEyebrowInner, CNoseTip, CNoseBase, CTipOfChin);
 
-
-
-	imshow("crop", crop);
-
-	waitKey();
-
+	imshow("crop da main", crop);
 
 	// 4.(f) função sqi
 //	Mat illumNorn;

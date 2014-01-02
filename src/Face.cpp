@@ -16,17 +16,16 @@ using namespace cv;
 using namespace std;
 
 Face::Face(char* imgPath) {
-	static const char* path = imgPath;
 
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
+	cv::Mat_<unsigned char> img(cv::imread(imgPath, CV_LOAD_IMAGE_GRAYSCALE));
 
 	if (!img.data)
-		error("Cannot load", path);
+		error("Cannot load", imgPath);
 
-	if (!stasm_open_image((const char*) img.data, img.cols, img.rows, path,
+	if (!stasm_open_image((const char*) img.data, img.cols, img.rows, imgPath,
 			1 /*multiface*/, 10 /*minwidth*/))
 		error("stasm_open_image failed: ", stasm_lasterr());
 
@@ -63,18 +62,60 @@ void Face::error(const char* s1, const char* s2) {
 	exit(1);
 }
 
+
+/**
+ * Calculates the angle between two points in degrees.
+ */
+double Face::angleBetweenTwoPoints(Point pt1, Point pt2)
+{
+	double deltaY = (pt2.y - pt1.y);
+	double deltaX = (pt2.x - pt1.x);
+
+	double angleInDegrees = atan2(deltaY, deltaX) * 180 / CV_PI;
+
+	return angleInDegrees;
+}
+
+/**
+ * Get STASM coordinates after rotation.
+ * http://stackoverflow.com/questions/7953316/rotate-a-point-around-a-point-with-opencv
+ */
+Point Face::rotatePoint(Point pt, double angle) {
+
+	angle = angle / (180 / CV_PI);
+
+	Point center =	Point(face.cols*0.5, face.rows*0.5);
+	Point midpoint = Point(pt.x - center.x, pt.y - center.y);
+
+	pt.x = (midpoint.x*cos(angle)) - (midpoint.y*sin(angle));
+	pt.y = (midpoint.x*sin(angle)) + (midpoint.y*cos(angle));
+
+	pt.x = (int)ceil(pt.x) + center.x;
+	pt.y = (int)ceil(pt.y) + center.y;
+
+	return pt;
+}
+
+/**
+ * Pose correction.
+ */
 Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 		Point LEyebrowInner, Point CNoseTip, Point CNoseBase,
 		Point CTipOfChin) {
 
-	double theta = atan2((double) LPupil.y - RPupil.y, LPupil.x - RPupil.x); //deg = * 180 / CV_PI;
+	double theta = angleBetweenTwoPoints( LPupil, RPupil);
 
-	double theta_deg = theta * 180 / CV_PI;
-	face = rotateImage(face, -180 + theta_deg);
+	cout << "theta = " << theta << endl;
 
-	for(unsigned int i = 0; i < getStasmPts().size(); i++)
+	face = rotateImage(face, theta);
+
+	int thickness = -1;
+	int lineType = 8;
+
+	for(unsigned int i = 0; i < 68; i++)
 	{
-		getStasmPts().at(i) = rotatePoint(getStasmPts().at(i), -180 + theta_deg);
+		stasmPts.at(i) = rotatePoint(getStasmPts().at(i), -theta);
+		circle(face, stasmPts.at(i), 2, Scalar(0, 255, 255), thickness, lineType);
 	}
 
 	LPupil = getStasmPts().at(31);
@@ -89,25 +130,23 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 
 	double eu = cv::norm(LEyebrowInner - CNoseTip);
 	double ed = cv::norm(CNoseBase - CTipOfChin);
-//		cv::imshow("rotatedImg", img);
 
 	// 4.(b) horizontal flip if dr smaller than dl
 //	if (gsl_fcmp(dl, dr, DBL_EPSILON) > 0) { // x = y returns 0; if x < y returns -1; x > y returns +1;
 //		flip(face, face, 1);
 //	}
 
-	int thickness = -1;
-	int lineType = 8;
-
-	circle(face, LPupil, 2, Scalar(0, 255, 255), thickness, lineType);
-	circle(face, RPupil, 2, Scalar(0, 255, 255), thickness, lineType);
-	circle(face, CNoseTip, 2, Scalar(0, 255, 255), thickness, lineType);
-	circle(face, LEyebrowInner, 2, Scalar(0, 255, 255), thickness, lineType);
-	circle(face, CNoseBase, 2, Scalar(0, 255, 255), thickness, lineType);
-	circle(face, CTipOfChin, 2, Scalar(0, 255, 255), thickness, lineType);
+//	int thickness = -1;
+//	int lineType = 8;
+//
+//	circle(face, LPupil, 2, Scalar(0, 255, 255), thickness, lineType);
+//	circle(face, RPupil, 2, Scalar(0, 255, 255), thickness, lineType);
+//	circle(face, CNoseTip, 2, Scalar(0, 255, 255), thickness, lineType);
+//	circle(face, LEyebrowInner, 2, Scalar(0, 255, 255), thickness, lineType);
+//	circle(face, CNoseBase, 2, Scalar(0, 255, 255), thickness, lineType);
+//	circle(face, CTipOfChin, 2, Scalar(0, 255, 255), thickness, lineType);
 
 	imshow("", face);
-	waitKey(0);
 
 	// image crop for better results
 	int x1, y1, x2, y2;
@@ -126,7 +165,6 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 	Mat crop = face(Rect(x1, y1, width, height));
 
 	imshow("", crop);
-	waitKey(0);
 
 	Point noseTop = calcMidpoint(stasmPts.at(24).x, stasmPts.at(24).y,
 			stasmPts.at(18).x, stasmPts.at(18).y);
@@ -175,6 +213,8 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 		}
 	}
 
+	imshow("out", out);
+
 	for (int row = 0; row < crop.rows; row++) {
 		for (int col = 0; col < crop.cols; col++) {
 			if (col < crop.cols * 0.5)
@@ -183,6 +223,8 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 				out2.at<uchar>(row, col) = out.at<uchar>(row, col - 1);
 		}
 	}
+
+	imshow("out2", out2);
 
 	return out2;
 }
@@ -270,8 +312,9 @@ double Face::calculateMean(double value[]) {
 	double max = 8;
 
 	double sum = 0;
-	for (int i = 0; i < max; i++)
+	for (int i = 0; i < max; i++){
 		sum += value[i];
+	}
 
 	return (sum / max);
 }
@@ -358,17 +401,7 @@ Point Face::calcMidpoint(double x1, double y1, double x2, double y2) {
  */
 vector<Point> Face::getStasmPts() {
 
-	return stasmPts;
-}
-
-/**
- * Get STASM coordinates after rotation.
- */
-Point Face::rotatePoint(Point pt, double angle) {
-	double a = 0.0;
-	a *= CV_PI / 180.0;
-	float cosa = cos(a), sina = sin(a);
-	return Point(pt.x * cosa - pt.y * sina, pt.x * sina + pt.y * cosa);
+	return this->stasmPts;
 }
 
 /**
