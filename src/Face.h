@@ -21,6 +21,7 @@
 #include <opencv2/opencv.hpp>
 #include <cstdlib>
 #include <cstdio>
+#include <string>
 #include <math.h>
 #include <gsl/gsl_statistics.h>
 #include <gsl/gsl_math.h>
@@ -51,13 +52,8 @@ private:
 	double pixelsMean(Mat img);
 	vector<Mat> divideIntoSubRegions(Mat region);
 	double localCorrelation(Mat rA, Mat rB);
-
-public:
-	Face(char* imgPath);
-	//libface lib functions
-	IplImage* SQI(IplImage* inp);
-
-	//FACE functions
+	Point rotatePoint(Point pt, double angle);
+	double angleBetweenTwoPoints(Point pt1, Point pt2);
 	Mat rotateImage(const Mat& source, double angle);
 	Mat correctPerpective(Mat src, Point pt1, Point pt2, Point pt3);
 	double sigmoid(double x);
@@ -67,23 +63,23 @@ public:
 	static void error(const char* s1, const char* s2);
 	Point calcMidpoint(double x1, double y1, double x2, double y2);
 	vector<Point> getStasmPts(char* imgPath, int shape);
-	void moveStasmPts(double angle);
+
+public:
+	Face(const char* imgPath);
+	//libface lib functions
+	IplImage* SQI(IplImage* inp);
+
+	//FACE functions
 	double globalCorrelation(Mat A, Mat B);
-	Point rotatePoint(Point pt, double angle);
-	double angleBetweenTwoPoints(Point pt1, Point pt2);
 	vector<Point> getStasmPts();
-	double calcSp(Point LPupil, Point RPupil, Point LEyebrowInner, Point CNoseTip, Point CNoseBase, Point CTipOfChin);
-	Mat normalizePose(Mat face, Point LPupil, Point RPupil, Point LEyebrowInner, Point CNoseTip, Point CNoseBase, Point CTipOfChin);
+	double calcSp(Point LPupil, Point RPupil, Point LEyebrowInner,
+			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
+	double calcSi(Point LPupil, Point RPupil, Point LEyebrowInner,
+			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
+	Mat normalizePose(Mat face, Point LPupil, Point RPupil, Point LEyebrowInner,
+			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
 	const Mat_<unsigned char>& loadMat() const {
 		return face;
-	}
-
-	double getTheta() const {
-		return theta;
-	}
-
-	void setTheta(double theta) {
-		this->theta = theta;
 	}
 };
 
