@@ -123,17 +123,23 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 		flip(face, face, 1);
 		for (unsigned int i = 0; i < 68; i++) {
 			stasmPts.at(i) = Point(face.cols - stasmPts.at(i).x, stasmPts.at(i).y);
-			circle(face, stasmPts.at(i), 2, Scalar(0, 255, 255), thickness, lineType);
+//			circle(face, stasmPts.at(i), 2, Scalar(0, 255, 255), thickness, lineType);
 		}
 	}
 
 	imshow("face", face);
 
 	// image crop for better results
-	int x1 = stasmPts.at(13).x - 10;
-	int y1 = stasmPts.at(23).y - 40;
-	int x2 = stasmPts.at(1).x + 10;
-	int y2 = stasmPts.at(7).y + 10;
+	int x1 = stasmPts.at(13).x - 7;
+	int y1 = stasmPts.at(23).y - 30;
+	int x2 = stasmPts.at(1).x + 7;
+	int y2 = stasmPts.at(7).y + 7;
+
+	cout << "x1 = " << x1 << endl;
+	cout << "y1 = " << y1 << endl;
+	cout << "x2 = " << x2 << endl;
+	cout << "y2 = " << y2 << endl;
+
 	int width = (x2 - x1);
 	int height = (y2 - y1);
 
@@ -141,22 +147,29 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 
 	imshow("crop", crop);
 
-	Point noseTop = calcMidpoint(stasmPts.at(24).x, stasmPts.at(24).y,
-			stasmPts.at(18).x, stasmPts.at(18).y);
-	Point topCenter = Point(noseTop.x, 0);
-	Point noseTip = stasmPts.at(67);
-	Point noseBase = stasmPts.at(41);
-	Point lipTop = stasmPts.at(51);
-	Point lipBottom = stasmPts.at(57);
-	Point chinTip = stasmPts.at(7);
+	Point noseTip = Point(stasmPts.at(67).x-x1-2, stasmPts.at(67).y-y1); //82,121
+	Point noseTop = calcMidpoint(stasmPts.at(24).x-x1-2, stasmPts.at(24).y - y1,
+			stasmPts.at(18).x-x1-2, stasmPts.at(18).y - y1); // 88,45
+	Point topCenter = Point(noseTop.x, 0); //
+	Point noseBase = Point(stasmPts.at(41).x-x1-2, stasmPts.at(41).y - y1); //OK
+	Point lipTop = Point(stasmPts.at(51).x-x1-2, stasmPts.at(51).y - y1);
+	Point lipBottom = Point(stasmPts.at(57).x-x1-2, stasmPts.at(57).y - y1);
+	Point chinTip = Point(stasmPts.at(7).x-x1-2, stasmPts.at(7).y - y1);
 	Point bottomCenter = Point(chinTip.x, crop.rows);
+
+	cout << "noseTip = " << noseTip.x << "," << noseTip.y << endl;
+	cout << "noseTop = " << noseTop.x << "," << noseTop.y << endl;
+	cout << "topCenter = " << topCenter.x << "," << topCenter.y << endl;
+	cout << "noseBase = " << noseBase.x << "," << noseBase.y << endl;
+	cout << "lipTop = " << lipTop.x << "," << lipTop.y << endl;
+	cout << "chinTip = " << chinTip.x << "," << chinTip.y << endl;
+	cout << "bottomCenter = " << bottomCenter.x << "," << bottomCenter.y << endl;
 
 	cv::Mat out(crop.rows, crop.cols, CV_8U);
 	cv::Mat out2(crop.rows, crop.cols, CV_8U);
 
 	Mat band1 = correctPerpective(crop, topCenter, noseTop,
 			Point(crop.cols, noseTop.y));
-
 	Mat band2 = correctPerpective(crop, noseTop, noseTip,
 			Point(crop.cols - (abs(noseTop.x - noseTip.x)), noseTip.y));
 	Mat band3 = correctPerpective(crop, noseTip, noseBase,
