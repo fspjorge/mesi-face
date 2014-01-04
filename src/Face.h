@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <ctime>
 #include <LibFace.h>
+#include <unistd.h>
 
 using namespace cv;
 using namespace std;

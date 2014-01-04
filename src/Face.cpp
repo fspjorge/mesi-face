@@ -97,13 +97,7 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 		Point CTipOfChin) {
 
 	double theta = angleBetweenTwoPoints(LPupil, RPupil);
-
-	cout << "theta = " << theta << endl;
-
 	face = rotateImage(face, theta);
-
-	int thickness = -1;
-	int lineType = 8;
 
 	for (unsigned int i = 0; i < 68; i++) {
 		stasmPts.at(i) = rotatePoint(getStasmPts().at(i), -theta);
@@ -115,55 +109,53 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 	LEyebrowInner = getStasmPts().at(24);
 	CNoseBase = getStasmPts().at(41);
 	CTipOfChin = getStasmPts().at(7);
-
 	double dl = cv::norm(LPupil - CNoseTip);
 	double dr = cv::norm(RPupil - CNoseTip);
 
 	if (gsl_fcmp(dl, dr, DBL_EPSILON) > 0) { // x = y returns 0; if x < y returns -1; x > y returns +1;
 		flip(face, face, 1);
 		for (unsigned int i = 0; i < 68; i++) {
-			stasmPts.at(i) = Point(face.cols - stasmPts.at(i).x, stasmPts.at(i).y);
-//			circle(face, stasmPts.at(i), 2, Scalar(0, 255, 255), thickness, lineType);
+			stasmPts.at(i) = Point(face.cols - stasmPts.at(i).x,
+					stasmPts.at(i).y);
 		}
 	}
 
-	imshow("face", face);
-
-	// image crop for better results
-	int x1 = stasmPts.at(13).x - 7;
-	int y1 = stasmPts.at(23).y - 30;
 	int x2 = stasmPts.at(1).x + 7;
 	int y2 = stasmPts.at(7).y + 7;
+	int x1 = stasmPts.at(13).x - 7;
+	int y1 = stasmPts.at(23).y - 20;
+
+	int width = abs(x1 - x2);
+	int height = abs(y2 - y1);
 
 	cout << "x1 = " << x1 << endl;
 	cout << "y1 = " << y1 << endl;
 	cout << "x2 = " << x2 << endl;
 	cout << "y2 = " << y2 << endl;
 
-	int width = (x2 - x1);
-	int height = (y2 - y1);
+	cout << "width = " << width << endl;
+	cout << "height = " << height << endl;
 
-	Mat crop = face(Rect(x1, y1, width, height));
+//	imshow("face", face);
+
+//	sleep(30);
+
+	 // OK até aqui
+
+	Mat crop = face(Rect(x1, y1, width, height)); // problema no crop
 
 	imshow("crop", crop);
 
-	Point noseTip = Point(stasmPts.at(67).x-x1-2, stasmPts.at(67).y-y1); //82,121
-	Point noseTop = calcMidpoint(stasmPts.at(24).x-x1-2, stasmPts.at(24).y - y1,
-			stasmPts.at(18).x-x1-2, stasmPts.at(18).y - y1); // 88,45
+	Point noseTip = Point(stasmPts.at(67).x - x1 - 2, stasmPts.at(67).y - y1); //82,121
+	Point noseTop = calcMidpoint(stasmPts.at(24).x - x1 - 2,
+			stasmPts.at(24).y - y1, stasmPts.at(18).x - x1 - 2,
+			stasmPts.at(18).y - y1); // 88,45
 	Point topCenter = Point(noseTop.x, 0); //
-	Point noseBase = Point(stasmPts.at(41).x-x1-2, stasmPts.at(41).y - y1); //OK
-	Point lipTop = Point(stasmPts.at(51).x-x1-2, stasmPts.at(51).y - y1);
-	Point lipBottom = Point(stasmPts.at(57).x-x1-2, stasmPts.at(57).y - y1);
-	Point chinTip = Point(stasmPts.at(7).x-x1-2, stasmPts.at(7).y - y1);
+	Point noseBase = Point(stasmPts.at(41).x - x1 - 2, stasmPts.at(41).y - y1); //OK
+	Point lipTop = Point(stasmPts.at(51).x - x1 - 2, stasmPts.at(51).y - y1);
+	Point lipBottom = Point(stasmPts.at(57).x - x1 - 2, stasmPts.at(57).y - y1);
+	Point chinTip = Point(stasmPts.at(7).x - x1 - 2, stasmPts.at(7).y - y1);
 	Point bottomCenter = Point(chinTip.x, crop.rows);
-
-	cout << "noseTip = " << noseTip.x << "," << noseTip.y << endl;
-	cout << "noseTop = " << noseTop.x << "," << noseTop.y << endl;
-	cout << "topCenter = " << topCenter.x << "," << topCenter.y << endl;
-	cout << "noseBase = " << noseBase.x << "," << noseBase.y << endl;
-	cout << "lipTop = " << lipTop.x << "," << lipTop.y << endl;
-	cout << "chinTip = " << chinTip.x << "," << chinTip.y << endl;
-	cout << "bottomCenter = " << bottomCenter.x << "," << bottomCenter.y << endl;
 
 	cv::Mat out(crop.rows, crop.cols, CV_8U);
 	cv::Mat out2(crop.rows, crop.cols, CV_8U);
@@ -201,10 +193,6 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 			band7.row(r).copyTo(out.row(r));
 		}
 	}
-
-	imshow("out", out);
-
-//	waitKey(0);
 
 	for (int row = 0; row < crop.rows; row++) {
 		for (int col = 0; col < crop.cols; col++) {
@@ -246,15 +234,19 @@ double Face::calcSp(Point LPupil, Point RPupil, Point LEyebrowInner,
 double Face::calcSi(Point LPupil, Point RPupil, Point LEyebrowInner,
 		Point CNoseTip, Point CNoseBase, Point CTipOfChin) {
 // Finding the 8 points
-	Point p1 = calcMidpoint(stasmPts.at(0).x, stasmPts.at(0).y, stasmPts.at(39).x, stasmPts.at(39).y);
-	Point p2 = calcMidpoint(stasmPts.at(3).x, stasmPts.at(3).y, stasmPts.at(39).x, stasmPts.at(39).y);
+	Point p1 = calcMidpoint(stasmPts.at(0).x, stasmPts.at(0).y,
+			stasmPts.at(39).x, stasmPts.at(39).y);
+	Point p2 = calcMidpoint(stasmPts.at(3).x, stasmPts.at(3).y,
+			stasmPts.at(39).x, stasmPts.at(39).y);
 	Point p3 = LEyebrowInner;
 	Point p4 = calcMidpoint((double) LEyebrowInner.x, (double) LEyebrowInner.y,
 			(double) CNoseTip.x, (double) CNoseTip.y);
 	Point p5 = CNoseTip;
 	Point p6 = CTipOfChin;
-	Point p7 = calcMidpoint(stasmPts.at(14).x, stasmPts.at(14).y, stasmPts.at(43).x, stasmPts.at(43).y);
-	Point p8 = calcMidpoint(stasmPts.at(10).x, stasmPts.at(10).y, stasmPts.at(43).x, stasmPts.at(43).y);
+	Point p7 = calcMidpoint(stasmPts.at(14).x, stasmPts.at(14).y,
+			stasmPts.at(43).x, stasmPts.at(43).y);
+	Point p8 = calcMidpoint(stasmPts.at(10).x, stasmPts.at(10).y,
+			stasmPts.at(43).x, stasmPts.at(43).y);
 
 	int length;
 
@@ -265,36 +257,36 @@ double Face::calcSi(Point LPupil, Point RPupil, Point LEyebrowInner,
 
 	Mat subMatPt1 = face(
 			cv::Rect(p1.x - (cvRound(length * 0.1) * 0.5),
-					p1.y - (cvRound(length * 0.1) * 0.5),
-					cvRound(length * 0.1), cvRound(length * 0.1)));
+					p1.y - (cvRound(length * 0.1) * 0.5), cvRound(length * 0.1),
+					cvRound(length * 0.1)));
 	Mat subMatPt2 = face(
 			cv::Rect(p2.x - (cvRound(length * 0.1) * 0.5),
-					p2.y - (cvRound(length * 0.1) * 0.5),
-					cvRound(length * 0.1), cvRound(length * 0.1)));
+					p2.y - (cvRound(length * 0.1) * 0.5), cvRound(length * 0.1),
+					cvRound(length * 0.1)));
 	Mat subMatPt3 = face(
 			cv::Rect(p3.x - (cvRound(length * 0.1) * 0.5),
-					p3.y - (cvRound(length * 0.1) * 0.5),
-					cvRound(length * 0.1), cvRound(length * 0.1)));
+					p3.y - (cvRound(length * 0.1) * 0.5), cvRound(length * 0.1),
+					cvRound(length * 0.1)));
 	Mat subMatPt4 = face(
 			cv::Rect(p4.x - (cvRound(length * 0.1) * 0.5),
-					p4.y - (cvRound(length * 0.1) * 0.5),
-					cvRound(length * 0.1), cvRound(length * 0.1)));
+					p4.y - (cvRound(length * 0.1) * 0.5), cvRound(length * 0.1),
+					cvRound(length * 0.1)));
 	Mat subMatPt5 = face(
 			cv::Rect(p5.x - (cvRound(length * 0.1) * 0.5),
-					p5.y - (cvRound(length * 0.1) * 0.5),
-					cvRound(length * 0.1), cvRound(length * 0.1)));
+					p5.y - (cvRound(length * 0.1) * 0.5), cvRound(length * 0.1),
+					cvRound(length * 0.1)));
 	Mat subMatPt6 = face(
 			cv::Rect(p6.x - (cvRound(length * 0.1) * 0.5),
-					p6.y - (cvRound(length * 0.1) * 0.5),
-					cvRound(length * 0.1), cvRound(length * 0.1)));
+					p6.y - (cvRound(length * 0.1) * 0.5), cvRound(length * 0.1),
+					cvRound(length * 0.1)));
 	Mat subMatPt7 = face(
 			cv::Rect(p7.x - (cvRound(length * 0.1) * 0.5),
-					p7.y - (cvRound(length * 0.1) * 0.5),
-					cvRound(length * 0.1), cvRound(length * 0.1)));
+					p7.y - (cvRound(length * 0.1) * 0.5), cvRound(length * 0.1),
+					cvRound(length * 0.1)));
 	Mat subMatPt8 = face(
 			cv::Rect(p8.x - (cvRound(length * 0.1) * 0.5),
-					p8.y - (cvRound(length * 0.1) * 0.5),
-					cvRound(length * 0.1), cvRound(length * 0.1)));
+					p8.y - (cvRound(length * 0.1) * 0.5), cvRound(length * 0.1),
+					cvRound(length * 0.1)));
 
 	cv::imwrite("histograms/w1.png", subMatPt1); // save
 	cv::imwrite("histograms/w2.png", subMatPt2); // save
@@ -316,8 +308,7 @@ double Face::calcSi(Point LPupil, Point RPupil, Point LEyebrowInner,
 	double mc_w7 = (double) getMassCenter("h7", subMatPt7);
 	double mc_w8 = (double) getMassCenter("h8", subMatPt8);
 
-	double mc[8] =
-			{ mc_w1, mc_w2, mc_w3, mc_w4, mc_w5, mc_w6, mc_w7, mc_w8 };
+	double mc[8] = { mc_w1, mc_w2, mc_w3, mc_w4, mc_w5, mc_w6, mc_w7, mc_w8 };
 	printf("The dataset is %g, %g, %g, %g, %g, %g, %g, %g\n", mc[0], mc[1],
 			mc[2], mc[3], mc[4], mc[5], mc[6], mc[7]);
 
