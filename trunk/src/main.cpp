@@ -8,7 +8,7 @@
 int main() {
 
 	clock_t time = clock();
-	static const char* imgPath = "scarlett_johansson_eyes_smile.jpg";
+	static const char* imgPath = "2013-12-24-163337.jpg";
 	Face face = Face(imgPath);
 	Mat img = face.loadMat();
 	vector<Point> stasmPts = face.getStasmPts();
@@ -24,13 +24,12 @@ int main() {
 	double si = face.calcSi(LPupil, RPupil, LEyebrowInner, CNoseBase, CNoseBase, CTipOfChin);
 
 	// C. POSE NORMALIZATION ###########################################
-
 	Mat crop = face.normalizePose(img, LPupil, RPupil, LEyebrowInner, CNoseTip, CNoseBase, CTipOfChin);
 
-	// F. ILLUMINATION NORMALIZATION ###########################################
-	Mat illumNorn;
+	// F. ILLUMINATION NORMALIZATION (SQI) ###########################################
 	IplImage copy = crop;
-	illumNorn = Mat(face.SQI(&copy));
+	Mat illumNorn = Mat(face.SQI(&copy));
+
 	cout << "globalCorr = " << face.globalCorrelation(crop, crop) << endl;
 	imshow("illumination norm with SQI", illumNorn);
 
