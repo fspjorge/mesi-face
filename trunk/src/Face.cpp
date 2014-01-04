@@ -112,35 +112,31 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 	double dl = cv::norm(LPupil - CNoseTip);
 	double dr = cv::norm(RPupil - CNoseTip);
 
+	int x1, y1, x2, y2;
+
 	if (gsl_fcmp(dl, dr, DBL_EPSILON) > 0) { // x = y returns 0; if x < y returns -1; x > y returns +1;
 		flip(face, face, 1);
 		for (unsigned int i = 0; i < 68; i++) {
 			stasmPts.at(i) = Point(face.cols - stasmPts.at(i).x,
 					stasmPts.at(i).y);
 		}
+		x1 = stasmPts.at(13).x - 7;
+		y1 = stasmPts.at(23).y - 20;
+		x2 = stasmPts.at(1).x + 7;
+		y2 = stasmPts.at(7).y + 7;
 	}
-
-	int x2 = stasmPts.at(1).x + 7;
-	int y2 = stasmPts.at(7).y + 7;
-	int x1 = stasmPts.at(13).x - 7;
-	int y1 = stasmPts.at(23).y - 20;
+	else
+	{
+		x2 = stasmPts.at(13).x - 7;
+		y1 = stasmPts.at(23).y - 20;
+		x1 = stasmPts.at(1).x + 7;
+		y2 = stasmPts.at(7).y + 7;
+	}
 
 	int width = abs(x1 - x2);
 	int height = abs(y2 - y1);
 
-	cout << "x1 = " << x1 << endl;
-	cout << "y1 = " << y1 << endl;
-	cout << "x2 = " << x2 << endl;
-	cout << "y2 = " << y2 << endl;
-
-	cout << "width = " << width << endl;
-	cout << "height = " << height << endl;
-
-//	imshow("face", face);
-
-//	sleep(30);
-
-	 // OK até aqui
+	imshow("face", face); // OK até aqui
 
 	Mat crop = face(Rect(x1, y1, width, height)); // problema no crop
 
