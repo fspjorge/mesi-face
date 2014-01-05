@@ -1,6 +1,8 @@
 /**
  * Author: Jorge Pereira
  * MESI-IPBEJA
+ * http://geosoft.no/development/cppstyle.html#Layout of the Recommendations
+ * http://stackoverflow.com/questions/5945555/examples-of-how-to-write-beautiful-c-comments
  */
 
 #include "Face.h"
@@ -8,30 +10,34 @@
 int main() {
 
 	clock_t time = clock();
-	static const char* imgPath = "2013-12-24-163337.jpg";
+	static const char* imgPath = "scarlett_johansson_eyes_smile.jpg";
 	Face face = Face(imgPath);
 	Mat img = face.loadMat();
-	vector<Point> stasmPts = face.getStasmPts();
+	vector<Point> stasmPtsVector = face.getStasmPts();
 
-	Point LPupil = stasmPts.at(31);
-	Point RPupil = stasmPts.at(36);
-	Point CNoseTip = stasmPts.at(67);
-	Point LEyebrowInner = stasmPts.at(24);
-	Point CNoseBase = stasmPts.at(41);
-	Point CTipOfChin = stasmPts.at(7);
+	Point lPupil = stasmPtsVector.at(31);
+	Point rPupil = stasmPtsVector.at(36);
+	Point noseTip = stasmPtsVector.at(67);
+	Point lEyebrowInner = stasmPtsVector.at(24);
+	Point noseBase = stasmPtsVector.at(41);
+	Point tipOfChin = stasmPtsVector.at(7);
 
-	double sp = face.calcSp(LPupil, RPupil, LEyebrowInner, CNoseBase, CNoseBase, CTipOfChin);
-	double si = face.calcSi(LPupil, RPupil, LEyebrowInner, CNoseBase, CNoseBase, CTipOfChin);
+	double sp1 = face.computeSp(lPupil, rPupil, lEyebrowInner, noseTip, noseBase, tipOfChin);
+	cout << "SP = " << sp1 << endl;
+	double si1 = face.computeSi(lPupil, rPupil, lEyebrowInner, noseTip, noseBase, tipOfChin);
+	cout << "SI = " << si1 << endl;
 
-	// C. POSE NORMALIZATION ###########################################
-	Mat crop = face.normalizePose(img, LPupil, RPupil, LEyebrowInner, CNoseTip, CNoseBase, CTipOfChin);
+	// 4.C) POSE NORMALIZATION ###########################################
+	Mat crop = face.normalizePose(img, lPupil, rPupil, lEyebrowInner, noseTip, noseBase, tipOfChin);
 
-	// F. ILLUMINATION NORMALIZATION (SQI) ###########################################
+	// 4.F) ILLUMINATION NORMALIZATION (SQI) ###########################################
 	IplImage copy = crop;
-	Mat illumNorn = Mat(face.SQI(&copy));
+	Mat sqiImg = Mat(face.SQI(&copy));
+	
+	// COMPARAÇÃO DAS DUAS IMAGENS
+	cout << "globalCorr = " << face.computeGlobalCorr(sqiImg, sqiImg) << endl;
+	imshow("illumination norm with SQI", sqiImg);
 
-	cout << "globalCorr = " << face.globalCorrelation(crop, crop) << endl;
-	imshow("illumination norm with SQI", illumNorn);
 
 	time = clock() - time;
 	int ms = double(time) / CLOCKS_PER_SEC * 1000;
