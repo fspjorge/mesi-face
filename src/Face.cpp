@@ -2,7 +2,7 @@
  * face.cpp
  *
  *  Created on: Dec 23, 2013
- *      Author: jorge
+ *      Author: Jorge Silva Pereira
  */
 
 #ifndef FACE_CPP_
@@ -35,23 +35,22 @@ Face::Face(const char* imgPath) {
 		if (!foundface)
 			break;      // note break
 
-		// for demonstration, convert from Stasm 77 points to XM2VTS 68 points
 		stasm_convert_shape(landmarks, 68);
 
-		// draw the landmarks on the image as white dots
 		int i = 0;
-		stasm_force_points_into_image(landmarks, img.cols, img.rows);
 		for (i = 0; i < stasm_NLANDMARKS; i++) {
 			stasmPts.push_back(
 					Point(cvRound(landmarks[i * 2]),
 							cvRound(landmarks[i * 2 + 1])));
 		}
-
 	}
 	this->face = img;
 	nfaces++;
 }
 
+/**
+ * Print error if STASM library is not found.
+ */
 void Face::error(const char* s1, const char* s2) {
 	printf("Stasm version %s: %s %s\n", stasm_VERSION, s1, s2);
 	exit(1);
@@ -60,7 +59,7 @@ void Face::error(const char* s1, const char* s2) {
 /**
  * Calculates the angle between two points in degrees.
  */
-double Face::angleBetweenTwoPoints(Point pt1, Point pt2) {
+double Face::computePointsAngle(Point pt1, Point pt2) {
 	double deltaY = (pt2.y - pt1.y);
 	double deltaX = (pt2.x - pt1.x);
 
@@ -70,12 +69,11 @@ double Face::angleBetweenTwoPoints(Point pt1, Point pt2) {
 }
 
 /**
- * Get STASM coordinates after rotation.
- * http://stackoverflow.com/questions/7953316/rotate-a-point-around-a-point-with-opencv
+ * Rotate STASM coordinates to match rotated image.
  */
 Point Face::rotatePoint(Point pt, double angle) {
 
-	angle = angle / (180 / CV_PI);
+	angle = angle / (180 / CV_PI); // convert angle to rad
 
 	Point center = Point(face.cols * 0.5, face.rows * 0.5);
 	Point midpoint = Point(pt.x - center.x, pt.y - center.y);
@@ -90,28 +88,31 @@ Point Face::rotatePoint(Point pt, double angle) {
 }
 
 /**
- * Pose correction.
+ * Pose correction:
+ * 1) The center of the eyes is used to correct head rolling [Fig. 4(a)].
+ * 2) The distances between the external corners of the left and right eyes and the tip of the nose, represented respectively by dl and dr [Fig. 4(b)].
+ * 	  If this is the right half (dr ≥ dl), the image is left unchanged; otherwise, it is reflected with respect to the vertical axis (horizontal flip).
+ * 3)
  */
-Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
-		Point LEyebrowInner, Point CNoseTip, Point CNoseBase,
-		Point CTipOfChin) {
+Mat Face::normalizePose(Mat face, Point lPupil, Point rPupil,
+		Point lEyebrowInner, Point noseTip, Point noseBase,
+		Point tipOfChin) {
 
-	double theta = angleBetweenTwoPoints(LPupil, RPupil);
+	double theta = computePointsAngle(lPupil, rPupil);
 	face = rotateImage(face, theta);
 
 	for (unsigned int i = 0; i < 68; i++) {
 		stasmPts.at(i) = rotatePoint(getStasmPts().at(i), -theta);
 	}
 
-	LPupil = getStasmPts().at(31);
-	RPupil = getStasmPts().at(36);
-	CNoseTip = getStasmPts().at(67);
-	LEyebrowInner = getStasmPts().at(24);
-	CNoseBase = getStasmPts().at(41);
-	CTipOfChin = getStasmPts().at(7);
-	double dl = cv::norm(LPupil - CNoseTip);
-	double dr = cv::norm(RPupil - CNoseTip);
-
+	lPupil = getStasmPts().at(31);
+	rPupil = getStasmPts().at(36);
+	noseTip = getStasmPts().at(67);
+	lEyebrowInner = getStasmPts().at(24);
+	noseBase = getStasmPts().at(41);
+	tipOfChin = getStasmPts().at(7);
+	double dl = cv::norm(lPupil - noseTip);
+	double dr = cv::norm(rPupil - noseTip);
 	int x1, y1, x2, y2;
 
 	if (gsl_fcmp(dl, dr, DBL_EPSILON) > 0) { // x = y returns 0; if x < y returns -1; x > y returns +1;
@@ -120,91 +121,89 @@ Mat Face::normalizePose(Mat face, Point LPupil, Point RPupil,
 			stasmPts.at(i) = Point(face.cols - stasmPts.at(i).x,
 					stasmPts.at(i).y);
 		}
-		x1 = stasmPts.at(13).x - 7;
-		y1 = stasmPts.at(23).y - 20;
-		x2 = stasmPts.at(1).x + 7;
-		y2 = stasmPts.at(7).y + 7;
+		x1 = stasmPts.at(13).x;
+		x2 = stasmPts.at(1).x;
+	} else {
+		x1 = stasmPts.at(1).x;
+		x2 = stasmPts.at(13).x;
 	}
-	else
-	{
-		x2 = stasmPts.at(13).x - 7;
-		y1 = stasmPts.at(23).y - 20;
-		x1 = stasmPts.at(1).x + 7;
-		y2 = stasmPts.at(7).y + 7;
-	}
+
+	y1 = stasmPts.at(23).y - 20;
+	y2 = stasmPts.at(7).y + 5;
 
 	int width = abs(x1 - x2);
 	int height = abs(y2 - y1);
 
-	imshow("face", face); // OK até aqui
-
-	Mat crop = face(Rect(x1, y1, width, height)); // problema no crop
+	Mat crop = face(Rect(x1, y1, width, height));
 
 	imshow("crop", crop);
 
-	Point noseTip = Point(stasmPts.at(67).x - x1 - 2, stasmPts.at(67).y - y1); //82,121
-	Point noseTop = calcMidpoint(stasmPts.at(24).x - x1 - 2,
-			stasmPts.at(24).y - y1, stasmPts.at(18).x - x1 - 2,
-			stasmPts.at(18).y - y1); // 88,45
+	noseTip = Point(stasmPts.at(67).x - x1, stasmPts.at(67).y - y1); //82,121
+	Point noseTop = calcMidpoint(stasmPts.at(24).x - x1, stasmPts.at(24).y - y1,
+			stasmPts.at(18).x - x1, stasmPts.at(18).y - y1); // 88,45
 	Point topCenter = Point(noseTop.x, 0); //
-	Point noseBase = Point(stasmPts.at(41).x - x1 - 2, stasmPts.at(41).y - y1); //OK
-	Point lipTop = Point(stasmPts.at(51).x - x1 - 2, stasmPts.at(51).y - y1);
-	Point lipBottom = Point(stasmPts.at(57).x - x1 - 2, stasmPts.at(57).y - y1);
-	Point chinTip = Point(stasmPts.at(7).x - x1 - 2, stasmPts.at(7).y - y1);
+	noseBase = Point(stasmPts.at(41).x - x1, stasmPts.at(41).y - y1); //OK
+	Point lipTop = Point(stasmPts.at(51).x - x1, stasmPts.at(51).y - y1);
+	Point lipBottom = Point(stasmPts.at(57).x - x1, stasmPts.at(57).y - y1);
+	Point chinTip = Point(stasmPts.at(7).x - x1, stasmPts.at(7).y - y1);
 	Point bottomCenter = Point(chinTip.x, crop.rows);
 
-	cv::Mat out(crop.rows, crop.cols, CV_8U);
-	cv::Mat out2(crop.rows, crop.cols, CV_8U);
+	cv::Mat stretch(crop.rows, crop.cols, CV_8U);
+	cv::Mat mirror(crop.rows, crop.cols, CV_8U);
 
-	Mat band1 = correctPerpective(crop, topCenter, noseTop,
+	Mat band1 = correctBandPerpective(crop, topCenter, noseTop,
 			Point(crop.cols, noseTop.y));
-	Mat band2 = correctPerpective(crop, noseTop, noseTip,
+	Mat band2 = correctBandPerpective(crop, noseTop, noseTip,
 			Point(crop.cols - (abs(noseTop.x - noseTip.x)), noseTip.y));
-	Mat band3 = correctPerpective(crop, noseTip, noseBase,
+	Mat band3 = correctBandPerpective(crop, noseTip, noseBase,
 			Point(crop.cols - (abs(noseTip.x - noseBase.x)), noseBase.y));
-	Mat band4 = correctPerpective(crop, noseBase, lipTop,
+	Mat band4 = correctBandPerpective(crop, noseBase, lipTop,
 			Point(crop.cols - (abs(noseBase.x - lipTop.x) + 2), lipTop.y));
-	Mat band5 = correctPerpective(crop, lipTop, lipBottom,
+	Mat band5 = correctBandPerpective(crop, lipTop, lipBottom,
 			Point(crop.cols - (abs(lipTop.x - lipBottom.x)), lipBottom.y));
-	Mat band6 = correctPerpective(crop, lipBottom, chinTip,
+	Mat band6 = correctBandPerpective(crop, lipBottom, chinTip,
 			Point(crop.cols - (abs(lipBottom.x - chinTip.x)), chinTip.y));
-	Mat band7 = correctPerpective(crop, chinTip, bottomCenter,
+	Mat band7 = correctBandPerpective(crop, chinTip, bottomCenter,
 			Point(crop.cols - (abs(chinTip.x - bottomCenter.x)),
 					bottomCenter.y));
 
 	for (int r = 0; r < crop.rows; r++) {
 		if (r < noseTop.y) {
-			band1.row(r).copyTo(out.row(r));
+			band1.row(r).copyTo(stretch.row(r));
 		} else if (r < noseTip.y) {
-			band2.row(r).copyTo(out.row(r));
+			band2.row(r).copyTo(stretch.row(r));
 		} else if (r < noseBase.y) {
-			band3.row(r).copyTo(out.row(r));
+			band3.row(r).copyTo(stretch.row(r));
 		} else if (r < lipTop.y) {
-			band4.row(r).copyTo(out.row(r));
+			band4.row(r).copyTo(stretch.row(r));
 		} else if (r < lipBottom.y) {
-			band5.row(r).copyTo(out.row(r));
+			band5.row(r).copyTo(stretch.row(r));
 		} else if (r < chinTip.y) {
-			band6.row(r).copyTo(out.row(r));
+			band6.row(r).copyTo(stretch.row(r));
 		} else {
-			band7.row(r).copyTo(out.row(r));
+			band7.row(r).copyTo(stretch.row(r));
 		}
 	}
 
 	for (int row = 0; row < crop.rows; row++) {
 		for (int col = 0; col < crop.cols; col++) {
 			if (col < crop.cols * 0.5)
-				out2.at<uchar>(row, col) = out.at<uchar>(row + 1, -col);
+				mirror.at<uchar>(row, col) = stretch.at<uchar>(row + 1, -col);
 			else
-				out2.at<uchar>(row, col) = out.at<uchar>(row, col - 1);
+				mirror.at<uchar>(row, col) = stretch.at<uchar>(row, col - 1);
 		}
 	}
 
-	imshow("out2", out2);
+	imshow("mirror", mirror);
 
-	return out2;
+	return mirror;
 }
 
-double Face::calcSp(Point LPupil, Point RPupil, Point LEyebrowInner,
+/**
+ * The SP index is defined as a weighted linear combination of values computed from them as follows:
+ * SP = α · (1 − roll) + β · (1 − yaw) + γ · (1 − pitch) (4)
+ */
+double Face::computeSp(Point LPupil, Point RPupil, Point LEyebrowInner,
 		Point CNoseTip, Point CNoseBase, Point CTipOfChin) {
 	double theta = atan2((double) LPupil.y - RPupil.y, LPupil.x - RPupil.x); //deg = * 180 / CV_PI;
 	double roll = min(abs((2 * theta) / CV_PI), 1.0); // rad
@@ -217,7 +216,7 @@ double Face::calcSp(Point LPupil, Point RPupil, Point LEyebrowInner,
 	double ed = cv::norm(CNoseBase - CTipOfChin);
 	double pitch = (max(eu, ed) - min(eu, ed)) / max(eu, ed);
 
-	// being alpha = 0.1, beta = 0.6 and gamma = 0.3 | article page 153
+	// being alpha = 0.1, beta = 0.6 and gamma = 0.3 as in article, page 153.
 	double alpha = 0.1;
 	double beta = 0.6;
 	double gamma = 0.3;
@@ -227,9 +226,13 @@ double Face::calcSp(Point LPupil, Point RPupil, Point LEyebrowInner,
 	return sp;
 }
 
-double Face::calcSi(Point LPupil, Point RPupil, Point LEyebrowInner,
+/**
+ * The sample illumination quality index SI is defined as a scalar in the interval [0,1] (the higher, the better), computed as:
+ * SI = 1− F (std(mc)) (6)
+ */
+double Face::computeSi(Point LPupil, Point RPupil, Point LEyebrowInner,
 		Point CNoseTip, Point CNoseBase, Point CTipOfChin) {
-// Finding the 8 points
+
 	Point p1 = calcMidpoint(stasmPts.at(0).x, stasmPts.at(0).y,
 			stasmPts.at(39).x, stasmPts.at(39).y);
 	Point p2 = calcMidpoint(stasmPts.at(3).x, stasmPts.at(3).y,
@@ -245,7 +248,6 @@ double Face::calcSi(Point LPupil, Point RPupil, Point LEyebrowInner,
 			stasmPts.at(43).x, stasmPts.at(43).y);
 
 	int length;
-
 	if (face.rows > face.cols)
 		length = face.cols;
 	else
@@ -293,25 +295,24 @@ double Face::calcSi(Point LPupil, Point RPupil, Point LEyebrowInner,
 	cv::imwrite("histograms/w7.png", subMatPt7); // save
 	cv::imwrite("histograms/w8.png", subMatPt8); // save
 
-	// histograms
-	// ver http://docs.opencv.org/doc/tutorials/imgproc/histograms/histogram_calculation/histogram_calculation.html
-	double mc_w1 = (double) getMassCenter("h1", subMatPt1);
-	double mc_w2 = (double) getMassCenter("h2", subMatPt2);
-	double mc_w3 = (double) getMassCenter("h3", subMatPt3);
-	double mc_w4 = (double) getMassCenter("h4", subMatPt4);
-	double mc_w5 = (double) getMassCenter("h5", subMatPt5);
-	double mc_w6 = (double) getMassCenter("h6", subMatPt6);
-	double mc_w7 = (double) getMassCenter("h7", subMatPt7);
-	double mc_w8 = (double) getMassCenter("h8", subMatPt8);
+	// histograms - http://docs.opencv.org/doc/tutorials/imgproc/histograms/histogram_calculation/histogram_calculation.html
+	double mc_w1 = (double) computeMassCenter("h1", subMatPt1);
+	double mc_w2 = (double) computeMassCenter("h2", subMatPt2);
+	double mc_w3 = (double) computeMassCenter("h3", subMatPt3);
+	double mc_w4 = (double) computeMassCenter("h4", subMatPt4);
+	double mc_w5 = (double) computeMassCenter("h5", subMatPt5);
+	double mc_w6 = (double) computeMassCenter("h6", subMatPt6);
+	double mc_w7 = (double) computeMassCenter("h7", subMatPt7);
+	double mc_w8 = (double) computeMassCenter("h8", subMatPt8);
 
 	double mc[8] = { mc_w1, mc_w2, mc_w3, mc_w4, mc_w5, mc_w6, mc_w7, mc_w8 };
 	printf("The dataset is %g, %g, %g, %g, %g, %g, %g, %g\n", mc[0], mc[1],
 			mc[2], mc[3], mc[4], mc[5], mc[6], mc[7]);
 
-	double std = calculateStd(mc);
+	double std = computeStdDev(mc);
 	printf("Std deviation = %f: \n", std);
 
-	double si = 1 - sigmoid(std);
+	double si = 1 - computeSigmoid(std);
 
 	return si;
 }
@@ -332,11 +333,12 @@ Mat Face::rotateImage(const Mat& source, double angle) {
 /**
  * Affine transformations to correct the band perspective.
  * Code based on http://stackoverflow.com/questions/7838487/executing-cvwarpperspective-for-a-fake-deskewing-on-a-set-of-cvpoint
- * 1-----3
+ * 1------3
+ * |    -
  * |  -
  * 2-
  */
-Mat Face::correctPerpective(Mat src, Point pt1, Point pt2, Point pt3) {
+Mat Face::correctBandPerpective(Mat src, Point pt1, Point pt2, Point pt3) {
 	Mat warp_dst;
 	Size size(src.cols, src.rows);
 	Point2f src_vertices[3];
@@ -361,7 +363,7 @@ Mat Face::correctPerpective(Mat src, Point pt1, Point pt2, Point pt3) {
 /**
  * Sigmoid function.
  */
-double Face::sigmoid(double x) {
+double Face::computeSigmoid(double x) {
 
 	double s = 0.0;
 	s = 1.0 / (1.0 + exp(-x / 160));
@@ -372,7 +374,7 @@ double Face::sigmoid(double x) {
 /**
  * Calculate mean. http://www.softwareandfinance.com/CPP/MeanVarianceStdDevi.html
  */
-double Face::calculateMean(double value[]) {
+double Face::computeMean(double value[]) {
 	double max = 8;
 
 	double sum = 0;
@@ -386,10 +388,10 @@ double Face::calculateMean(double value[]) {
 /**
  * Calculate Variance. From http://www.softwareandfinance.com/CPP/MeanVarianceStdDevi.html
  */
-double Face::calculateStd(double value[]) {
+double Face::computeStdDev(double value[]) {
 	int max = 8;
 	double mean;
-	mean = calculateMean(value);
+	mean = computeMean(value);
 
 	double temp = 0;
 	for (int i = 0; i < max; i++) {
@@ -404,7 +406,7 @@ double Face::calculateStd(double value[]) {
  * Returns the value of the center of mass for each submatrix.
  * From http://stackoverflow.com/questions/15771512/compare-histograms-of-grayscale-images-in-opencv
  */
-double Face::getMassCenter(std::string const& name, Mat1b const& image) {
+double Face::computeMassCenter(std::string const& name, Mat1b const& image) {
 	// Set histogram bins count
 	int bins = 256;
 	int histSize[] = { bins };
@@ -542,7 +544,7 @@ double Face::localCorrelation(Mat rA, Mat rB) {
 /**
  * Soma dos máximos das subregiões (WORK IN PROGRESS).
  */
-double Face::globalCorrelation(Mat A, Mat B) {
+double Face::computeGlobalCorr(Mat A, Mat B) {
 	double SumAB = 0.0;
 	vector<double> localMax;
 
@@ -627,6 +629,8 @@ double Face::globalCorrelation(Mat A, Mat B) {
 		//somar máximos locais
 		SumAB += *max_element(localMax.begin(), localMax.end());
 	}
+
+	cout << "global corr mean = " << SumAB / subRegionsOfA.size() << endl;
 
 	return SumAB;
 }

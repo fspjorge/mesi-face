@@ -2,7 +2,7 @@
  * face.h
  *
  *  Created on: Dec 23, 2013
- *      Author: jorge
+ *      Author: Jorge Silva Pereira
  */
 
 #ifndef FACE_H_
@@ -54,13 +54,13 @@ private:
 	vector<Mat> divideIntoSubRegions(Mat region);
 	double localCorrelation(Mat rA, Mat rB);
 	Point rotatePoint(Point pt, double angle);
-	double angleBetweenTwoPoints(Point pt1, Point pt2);
+	double computePointsAngle(Point pt1, Point pt2);
 	Mat rotateImage(const Mat& source, double angle);
-	Mat correctPerpective(Mat src, Point pt1, Point pt2, Point pt3);
-	double sigmoid(double x);
-	double calculateMean(double value[]);
-	double calculateStd(double value[]);
-	double getMassCenter(std::string const& name, Mat1b const& image);
+	Mat correctBandPerpective(Mat src, Point pt1, Point pt2, Point pt3);
+	double computeSigmoid(double x);
+	double computeMean(double value[]);
+	double computeStdDev(double value[]);
+	double computeMassCenter(std::string const& name, Mat1b const& image);
 	static void error(const char* s1, const char* s2);
 	Point calcMidpoint(double x1, double y1, double x2, double y2);
 	vector<Point> getStasmPts(char* imgPath, int shape);
@@ -71,11 +71,11 @@ public:
 	IplImage* SQI(IplImage* inp);
 
 	//FACE functions
-	double globalCorrelation(Mat A, Mat B);
+	double computeGlobalCorr(Mat A, Mat B);
 	vector<Point> getStasmPts();
-	double calcSp(Point LPupil, Point RPupil, Point LEyebrowInner,
+	double computeSp(Point LPupil, Point RPupil, Point LEyebrowInner,
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
-	double calcSi(Point LPupil, Point RPupil, Point LEyebrowInner,
+	double computeSi(Point LPupil, Point RPupil, Point LEyebrowInner,
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
 	Mat normalizePose(Mat face, Point LPupil, Point RPupil, Point LEyebrowInner,
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
