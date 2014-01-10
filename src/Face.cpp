@@ -16,6 +16,7 @@ Face::Face(const char* imgPath) {
 		error("stasm_init failed: ", stasm_lasterr());
 
 	cv::Mat_<unsigned char> img(cv::imread(imgPath, CV_LOAD_IMAGE_GRAYSCALE));
+//	resize(img, img, Size(250, 250)); // image resizing for better performance
 
 	if (!img.data)
 		error("Cannot load", imgPath);
@@ -31,10 +32,8 @@ Face::Face(const char* imgPath) {
 	while (1) {
 		if (!stasm_search_auto(&foundface, landmarks))
 			error("stasm_search_auto failed: ", stasm_lasterr());
-
 		if (!foundface)
 			break;      // note break
-
 		stasm_convert_shape(landmarks, 68);
 
 		int i = 0;
@@ -88,6 +87,17 @@ Point Face::rotatePoint(Point pt, double angle) {
 }
 
 /**
+ * Illumination correction using the SQI algorithm.
+ */
+Mat Face::normalizeIllumination(Mat face)
+{
+	IplImage copy = face;
+	Mat sqiImg = Mat(SQI(&copy));
+
+	return sqiImg;
+}
+
+/**
  * Pose correction:
  * 1) The center of the eyes is used to correct head rolling [Fig. 4(a)].
  * 2) The distances between the external corners of the left and right eyes and the tip of the nose, represented respectively by dl and dr [Fig. 4(b)].
@@ -135,8 +145,6 @@ Mat Face::normalizePose(Mat face, Point lPupil, Point rPupil,
 	int height = abs(y2 - y1);
 
 	Mat crop = face(Rect(x1, y1, width, height));
-
-	imshow("crop", crop);
 
 	noseTip = Point(stasmPts.at(67).x - x1, stasmPts.at(67).y - y1); //82,121
 	Point noseTop = calcMidpoint(stasmPts.at(24).x - x1, stasmPts.at(24).y - y1,
@@ -193,8 +201,6 @@ Mat Face::normalizePose(Mat face, Point lPupil, Point rPupil,
 				mirror.at<uchar>(row, col) = stretch.at<uchar>(row, col - 1);
 		}
 	}
-
-	imshow("mirror", mirror);
 
 	return mirror;
 }
@@ -473,7 +479,7 @@ vector<Point> Face::getStasmPts() {
 /**
  * Calculates the average value of the pixels of a matrix.
  */
-double Face::pixelsMean(Mat img) {
+double Face::computePixelsMean(Mat img) {
 	vector<Mat> channels;
 	split(img, channels);
 	Scalar m = mean(channels[0]);
@@ -488,7 +494,7 @@ double Face::pixelsMean(Mat img) {
 vector<Mat> Face::divideIntoSubRegions(Mat region) {
 
 	vector<Mat> subRegions;
-	int roiSize = 8;
+	int roiSize = 10;
 
 	for (int i = 0; i < region.cols / roiSize; ++i) {
 		for (int j = 0; j < region.rows / roiSize; ++j) {
@@ -516,10 +522,10 @@ vector<Mat> Face::divideIntoSubRegions(Mat region) {
 /**
  * Calculates the correlation between two cv::Mat.
  */
-double Face::localCorrelation(Mat rA, Mat rB) {
+double Face::computelocalCorrelation(Mat rA, Mat rB) {
 
-	double rAPixMean = pixelsMean(rA);
-	double rBPixMean = pixelsMean(rB);
+	double rAPixMean = computePixelsMean(rA);
+	double rBPixMean = computePixelsMean(rB);
 
 	double sum1 = 0.0;
 	double sum2 = 0.0;
@@ -544,8 +550,8 @@ double Face::localCorrelation(Mat rA, Mat rB) {
 /**
  * Soma dos máximos das subregiões (WORK IN PROGRESS).
  */
-double Face::computeGlobalCorr(Mat A, Mat B) {
-	double SumAB = 0.0;
+double Face::computeGlobalCorrelation(Mat A, Mat B) {
+	double sumAB = 0.0;
 	vector<double> localMax;
 
 	cv::resize(A, B, A.size(), 0, 0, cv::INTER_CUBIC);
@@ -555,7 +561,7 @@ double Face::computeGlobalCorr(Mat A, Mat B) {
 
 	unsigned int regionsPerLine = div(A.cols, 8).quot;
 
-//	cout << "regionsPerLine = " << regionsPerLine << endl;
+	cout << "regionsPerLine = " << regionsPerLine << endl;
 
 	for (unsigned int i = 0; i < subRegionsOfA.size(); i++) {
 		localMax.clear();
@@ -567,9 +573,9 @@ double Face::computeGlobalCorr(Mat A, Mat B) {
 			 *
 			 */
 //			cout << "i = 0 " << endl;
-//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ")"<< endl;
+//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
 			localMax.push_back(
-					localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
+					computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
 		} else if (i > 0 && i < regionsPerLine) {
 
 			/**
@@ -578,12 +584,13 @@ double Face::computeGlobalCorr(Mat A, Mat B) {
 			 *
 			 */
 //			cout << "i > 0 && i < regionsPerLine " << endl;
-//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ")"<< endl;
+//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
 			localMax.push_back(
-					localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
-//			cout << "A comparar a região i(" << i << ") com a região i(" << (i-1) << ")"<< endl;
+					computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
+//			cout << "A comparar a região i(" << i << ") com a região i(" << (i-1) << ") => " << computelocalCorrelation(subRegionsOfA.at(i),
+//					subRegionsOfB.at(i - 1)) << endl;
 			localMax.push_back(
-					localCorrelation(subRegionsOfA.at(i),
+					computelocalCorrelation(subRegionsOfA.at(i),
 							subRegionsOfB.at(i - 1)));
 		} else if (i % regionsPerLine == 0) {
 			/**
@@ -593,13 +600,14 @@ double Face::computeGlobalCorr(Mat A, Mat B) {
 			 *
 			 */
 //			cout << "i > 0 && i < regionsPerLine " << endl;
-//			cout << "A comparar a região i(" << i << ") com a região i-regionsPerLine(" << (i-regionsPerLine) << ")"<< endl;
+//			cout << "A comparar a região i(" << i << ") com a região i-regionsPerLine(" << (i-regionsPerLine) << ") --> " << computelocalCorrelation(subRegionsOfA.at(i),
+//					subRegionsOfB.at(i - regionsPerLine)) << endl;
 			localMax.push_back(
-					localCorrelation(subRegionsOfA.at(i),
+					computelocalCorrelation(subRegionsOfA.at(i),
 							subRegionsOfB.at(i - regionsPerLine)));
-//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ")"<< endl;
+//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") --> " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
 			localMax.push_back(
-					localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
+					computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
 		} else {
 			/**
 			 * ______
@@ -609,30 +617,32 @@ double Face::computeGlobalCorr(Mat A, Mat B) {
 			 */
 
 //			cout << "i > 0 && i < regionsPerLine " << endl;
-//
-//			cout << "A comparar a região " << i << " com a região i(" << i << ")" << endl;
+
+//			cout << "A comparar a região " << i << " com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
 			localMax.push_back(
-					localCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
-//			cout << "A comparar a região " << i << " com a região i-1(" << (i - 1) << ")" << endl;
+					computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
+//			cout << "A comparar a região " << i << " com a região i-1(" << (i - 1) << ") => " << computelocalCorrelation(subRegionsOfA.at(i),
+//					subRegionsOfB.at(i - 1)) << endl;
 			localMax.push_back(
-					localCorrelation(subRegionsOfA.at(i),
+					computelocalCorrelation(subRegionsOfA.at(i),
 							subRegionsOfB.at(i - 1)));
 //			cout << "A comparar a região " << i << " com a região i - regionsPerLine(" << i - regionsPerLine << ")" << endl;
 			localMax.push_back(
-					localCorrelation(subRegionsOfA.at(i),
+					computelocalCorrelation(subRegionsOfA.at(i),
 							subRegionsOfB.at(i - regionsPerLine)));
 //			cout << "A comparar a região " << i << " com a região i - regionsPerLine + 1 (" << (i - regionsPerLine + 1) << ")" << endl;
 			localMax.push_back(
-					localCorrelation(subRegionsOfA.at(i),
+					computelocalCorrelation(subRegionsOfA.at(i),
 							subRegionsOfB.at(i - regionsPerLine + 1)));
 		}
 		//somar máximos locais
-		SumAB += *max_element(localMax.begin(), localMax.end());
+		sumAB += *max_element(localMax.begin(), localMax.end());
 	}
+	cout << "SumAB = " << sumAB << endl;
+	cout << "subRegionsOfA.size() = " << subRegionsOfA.size() << endl;
+	cout << "global corr mean = " << sumAB / (double)subRegionsOfA.size() << endl;
 
-	cout << "global corr mean = " << SumAB / subRegionsOfA.size() << endl;
-
-	return SumAB;
+	return sumAB;
 }
 
 IplImage* Face::Rgb2Gray(IplImage *src) {
@@ -822,7 +832,7 @@ CvMat* Face::Weighted_Gaussian(CvMat *inp, CvMat *gaussian) {
 	for (i = 0; i < inp->rows; i++) {
 		for (j = 0; j < inp->cols; j++) {
 			tmp1 = cvmGet(w_gauss, i, j);
-			tmp2 = tmp1 / scl_factor;
+			tmp2 = tmp1 / (scl_factor * 1);
 			cvmSet(w_gauss, i, j, tmp2);
 		}
 	}
