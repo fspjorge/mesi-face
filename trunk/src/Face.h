@@ -37,7 +37,6 @@ class Face {
 private:
 	vector<Point> stasmPts;
 	Mat_<unsigned char> face;
-	double theta;
 
 	//libface lib functions
 	IplImage* Rgb2Gray(IplImage *src);
@@ -48,11 +47,10 @@ private:
 	CvMat* Get_Mat(CvPoint a, int width, int height, IplImage *image);
 	CvMat* Conv_Weighted_Gaussian(IplImage *inp_img, CvMat *kernel);
 	CvMat* Gaussian(int size);
-
+	IplImage* SQI(IplImage* inp);
 	//aux functions
-	double pixelsMean(Mat img);
+	double computePixelsMean(Mat img);
 	vector<Mat> divideIntoSubRegions(Mat region);
-	double localCorrelation(Mat rA, Mat rB);
 	Point rotatePoint(Point pt, double angle);
 	double computePointsAngle(Point pt1, Point pt2);
 	Mat rotateImage(const Mat& source, double angle);
@@ -67,11 +65,8 @@ private:
 
 public:
 	Face(const char* imgPath);
-	//libface lib functions
-	IplImage* SQI(IplImage* inp);
-
-	//FACE functions
-	double computeGlobalCorr(Mat A, Mat B);
+	double computelocalCorrelation(Mat rA, Mat rB);
+	double computeGlobalCorrelation(Mat A, Mat B);
 	vector<Point> getStasmPts();
 	double computeSp(Point LPupil, Point RPupil, Point LEyebrowInner,
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
@@ -79,6 +74,7 @@ public:
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
 	Mat normalizePose(Mat face, Point LPupil, Point RPupil, Point LEyebrowInner,
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
+	Mat normalizeIllumination(Mat face);
 	const Mat_<unsigned char>& loadMat() const {
 		return face;
 	}
