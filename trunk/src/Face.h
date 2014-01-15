@@ -37,7 +37,6 @@ class Face {
 private:
 	vector<Point> stasmPts;
 	Mat_<unsigned char> face;
-
 	//libface lib functions
 	IplImage* Rgb2Gray(IplImage *src);
 	CvMat* IplImage2Mat(IplImage *inp_img);
@@ -62,10 +61,9 @@ private:
 	static void error(const char* s1, const char* s2);
 	Point calcMidpoint(double x1, double y1, double x2, double y2);
 	vector<Point> getStasmPts(char* imgPath, int shape);
-
 public:
 	Face(const char* imgPath);
-	double computelocalCorrelation(Mat rA, Mat rB);
+	double computeLocalCorrelation(Mat rA, Mat rB);
 	double computeGlobalCorrelation(Mat A, Mat B);
 	vector<Point> getStasmPts();
 	double computeSp(Point LPupil, Point RPupil, Point LEyebrowInner,
