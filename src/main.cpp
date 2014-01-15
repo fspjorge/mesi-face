@@ -19,7 +19,7 @@ int main() {
 	clock_t time = clock();
 
 	//FACE 1
-	static const char* imgPath = "img/2.jpg";
+	static const char* imgPath = "img/beard-face.jpg";
 	Face face = Face(imgPath);
 	Mat img = face.loadMat();
 	vector<Point> stasmPtsVector = face.getStasmPts();
@@ -46,16 +46,14 @@ int main() {
 			noseBase, tipOfChin);
 
 	// 4.F) Illumination Normalization
-//	img = face.normalizeIllumination(img);
+	img = face.normalizeIllumination(img);
 
 	imshow("illumination norm with SQI", img);
-
-	waitKey(0);
 
 	//percorrer todas as imagens de uma pasta
 
 	namespace fs = boost::filesystem;
-	fs::path someDir("/home/jorge/workspace/dissertacao/");
+	fs::path someDir("/home/jorge/workspace/dissertacao/img");
 	fs::directory_iterator end_iter;
 
 	typedef std::multimap<std::time_t, fs::path> result_set_t;
@@ -65,14 +63,19 @@ int main() {
 		for (fs::directory_iterator dir_iter(someDir); dir_iter != end_iter;
 				++dir_iter) {
 			if (fs::is_regular_file(dir_iter->status())) {
+
 				cout << dir_iter->path().filename().extension() << endl;
+
 				if (dir_iter->path().filename().extension() == ".jpg") {
 					cout << "Image 2 #############################" << endl;
 					cout << dir_iter->path().filename() << endl;
 					// FACE 2
-					static const char* imgPath2 =
+					string root =
+							"/home/jorge/workspace/dissertacao/img/";
+					string imgPath2 =
 							dir_iter->path().filename().string().c_str();
-					Face face2 = Face(imgPath2);
+					string total = root + imgPath2;
+					Face face2 = Face(total.c_str());
 					Mat img2 = face2.loadMat();
 					vector<Point> stasmPtsVector2 = face2.getStasmPts();
 
