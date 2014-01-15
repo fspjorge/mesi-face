@@ -10,17 +10,17 @@
 
 #include "Face.h"
 
-Face::Face(const char* path) {
+Face::Face(const char* imgPath) {
 
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
+	cv::Mat_<unsigned char> img(cv::imread(imgPath, CV_LOAD_IMAGE_GRAYSCALE));
 
 	if (!img.data)
-		error("Cannot load", path);
+		error("Cannot load", imgPath);
 
-	if (!stasm_open_image((const char*) img.data, img.cols, img.rows, path,
+	if (!stasm_open_image((const char*) img.data, img.cols, img.rows, imgPath,
 			1 /*multiface*/, 10 /*minwidth*/))
 		error("stasm_open_image failed: ", stasm_lasterr());
 
@@ -28,13 +28,16 @@ Face::Face(const char* path) {
 	float landmarks[2 * stasm_NLANDMARKS]; // x,y coords (note the 2)
 
 	if (!stasm_search_single(&foundface, landmarks, (char*) img.data, img.cols,
-			img.rows, path, "../data")) {
+			img.rows, imgPath, "../data")) {
 		printf("Error in stasm_search_single: %s\n", stasm_lasterr());
 		exit(1);
 	}
 
-	if (!foundface)
-		printf("No face found in %s\n", path);
+	if(!foundface)
+	{
+		printf("No face found in %s, exiting...\n", imgPath);
+		exit(1);
+	}
 	else {
 		// draw the landmarks on the image as white dots
 		stasm_force_points_into_image(landmarks, img.cols, img.rows);
@@ -46,45 +49,6 @@ Face::Face(const char* path) {
 		}
 	}
 	this->face = img;
-}
-
-/**
- * Print error if STASM library is not found.
- */
-void Face::error(const char* s1, const char* s2) {
-	printf("Stasm version %s: %s %s\n", stasm_VERSION, s1, s2);
-	exit(1);
-}
-
-/**
- * Calculates the angle between two points in degrees.
- */
-double Face::computePointsAngle(Point pt1, Point pt2) {
-	double deltaY = (pt2.y - pt1.y);
-	double deltaX = (pt2.x - pt1.x);
-
-	double angleInDegrees = atan2(deltaY, deltaX) * 180 / CV_PI;
-
-	return angleInDegrees;
-}
-
-/**
- * Rotate STASM coordinates to match rotated image.
- */
-Point Face::rotatePoint(Point pt, double angle) {
-
-	angle = angle / (180 / CV_PI); // convert angle to rad
-
-	Point center = Point(face.cols * 0.5, face.rows * 0.5);
-	Point midpoint = Point(pt.x - center.x, pt.y - center.y);
-
-	pt.x = (midpoint.x * cos(angle)) - (midpoint.y * sin(angle));
-	pt.y = (midpoint.x * sin(angle)) + (midpoint.y * cos(angle));
-
-	pt.x = (int) ceil(pt.x) + center.x;
-	pt.y = (int) ceil(pt.y) + center.y;
-
-	return pt;
 }
 
 /**
@@ -101,8 +65,6 @@ Mat Face::normalizeIllumination(Mat face) {
  * Get STASM points array from image.
  */
 vector<Point> Face::getStasmPts() {
-
-	cout << stasmPts.size() << endl;
 	return this->stasmPts;
 }
 
@@ -345,6 +307,147 @@ double Face::computeSi(Point LPupil, Point RPupil, Point LEyebrowInner,
 }
 
 /**
+ * Calculates the correlation between two cv::Mat.
+ */
+double Face::computeLocalCorrelation(Mat A, Mat B) {
+
+	double aPixMean = computePixelsMean(A);
+	cout << "aPixMean = " << aPixMean << endl;
+	double bPixMean = computePixelsMean(B);
+	cout << "bPixMean = " << bPixMean << endl;
+
+	double sum1 = 0.0;
+	double sum2 = 0.0;
+	double sum3 = 0.0;
+
+	for (int i = 0; i < A.cols; i++) {
+		for (int j = 0; j < A.rows; j++) {
+
+			sum1 += (A.at<uchar>(i, j) - aPixMean)
+					* (B.at<uchar>(i, j) - bPixMean);
+			sum2 += pow(A.at<uchar>(i, j) - aPixMean, 2.0);
+			sum3 += pow(B.at<uchar>(i, j) - bPixMean, 2.0);
+		}
+	}
+
+	double corr = sum1 / (sqrt(sum2 * sum3));
+//	cout << "corrLocal = " << corr << endl;
+
+	return corr;
+}
+
+/**
+ * Soma dos máximos das subregiões (WORK IN PROGRESS).
+ */
+double Face::computeGlobalCorrelation(Mat A, Mat B) {
+	double sumAB = 0.0;
+	vector<double> localMax;
+
+	cv::resize(A, B, A.size(), 0, 0, cv::INTER_CUBIC);
+
+	vector<Mat> subRegionsOfA = divideIntoSubRegions(A);
+	vector<Mat> subRegionsOfB = divideIntoSubRegions(B);
+
+	unsigned int regionsPerLine = div(A.cols, 8).quot;
+
+	cout << "regionsPerLine = " << regionsPerLine << endl;
+
+	for (unsigned int i = 0; i < subRegionsOfA.size(); i++) {
+		localMax.clear();
+
+		if (i == 0) {
+			/**
+			 * ____
+			 * |__|
+			 *
+			 */
+//			cout << "i = 0 " << endl;
+//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
+			localMax.push_back(
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i)));
+		} else if (i > 0 && i < regionsPerLine) {
+
+			/**
+			 * ______
+			 * |__|__|
+			 *
+			 */
+//			cout << "i > 0 && i < regionsPerLine " << endl;
+//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
+			localMax.push_back(
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i)));
+//			cout << "A comparar a região i(" << i << ") com a região i(" << (i-1) << ") => " << computelocalCorrelation(subRegionsOfA.at(i),
+//					subRegionsOfB.at(i - 1)) << endl;
+			localMax.push_back(
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i - 1)));
+		} else if (i % regionsPerLine == 0) {
+			/**
+			 * ____
+			 * |__|
+			 * |__|
+			 *
+			 */
+//			cout << "i > 0 && i < regionsPerLine " << endl;
+//			cout << "A comparar a região i(" << i << ") com a região i-regionsPerLine(" << (i-regionsPerLine) << ") --> " << computelocalCorrelation(subRegionsOfA.at(i),
+//					subRegionsOfB.at(i - regionsPerLine)) << endl;
+			localMax.push_back(
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i - regionsPerLine)));
+//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") --> " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
+			localMax.push_back(
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i)));
+		} else {
+			/**
+			 * ______
+			 * |__|__|
+			 * |__|__|
+			 *
+			 */
+
+//			cout << "i > 0 && i < regionsPerLine " << endl;
+//			cout << "A comparar a região " << i << " com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
+			localMax.push_back(
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i)));
+//			cout << "A comparar a região " << i << " com a região i-1(" << (i - 1) << ") => " << computelocalCorrelation(subRegionsOfA.at(i),
+//					subRegionsOfB.at(i - 1)) << endl;
+			localMax.push_back(
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i - 1)));
+//			cout << "A comparar a região " << i << " com a região i - regionsPerLine(" << i - regionsPerLine << ")" << endl;
+			localMax.push_back(
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i - regionsPerLine)));
+//			cout << "A comparar a região " << i << " com a região i - regionsPerLine + 1 (" << (i - regionsPerLine + 1) << ")" << endl;
+			localMax.push_back(
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i - regionsPerLine + 1)));
+		}
+		//somar máximos locais
+		sumAB += *max_element(localMax.begin(), localMax.end());
+	}
+	cout << "SumAB = " << sumAB << endl;
+	cout << "subRegionsOfA.size() = " << subRegionsOfA.size() << endl;
+	cout << "global corr mean = " << sumAB / (double) subRegionsOfA.size()
+			<< endl;
+
+	return sumAB;
+}
+
+
+/**
+ * Print error if STASM library is not found.
+ */
+void Face::error(const char* s1, const char* s2) {
+	printf("Stasm version %s: %s %s\n", stasm_VERSION, s1, s2);
+	exit(1);
+}
+
+/**
  * Rotate image depending on the angle.
  * From http://stackoverflow.com/questions/2289690/opencv-how-to-rotate-iplimage
  */
@@ -532,136 +635,37 @@ vector<Mat> Face::divideIntoSubRegions(Mat region) {
 	return subRegions;
 }
 
+
+
 /**
- * Calculates the correlation between two cv::Mat.
+ * Calculates the angle between two points in degrees.
  */
-double Face::computeLocalCorrelation(Mat A, Mat B) {
+double Face::computePointsAngle(Point pt1, Point pt2) {
+	double deltaY = (pt2.y - pt1.y);
+	double deltaX = (pt2.x - pt1.x);
 
-	double aPixMean = computePixelsMean(A);
-	cout << "aPixMean = " << aPixMean << endl;
-	double bPixMean = computePixelsMean(B);
-	cout << "bPixMean = " << bPixMean << endl;
+	double angleInDegrees = atan2(deltaY, deltaX) * 180 / CV_PI;
 
-	double sum1 = 0.0;
-	double sum2 = 0.0;
-	double sum3 = 0.0;
-
-	for (int i = 0; i < A.cols; i++) {
-		for (int j = 0; j < A.rows; j++) {
-
-			sum1 += (A.at<uchar>(i, j) - aPixMean)
-					* (B.at<uchar>(i, j) - bPixMean);
-			sum2 += pow(A.at<uchar>(i, j) - aPixMean, 2.0);
-			sum3 += pow(B.at<uchar>(i, j) - bPixMean, 2.0);
-		}
-	}
-
-	double corr = sum1 / (sqrt(sum2 * sum3));
-//	cout << "corrLocal = " << corr << endl;
-
-	return corr;
+	return angleInDegrees;
 }
 
 /**
- * Soma dos máximos das subregiões (WORK IN PROGRESS).
+ * Rotate STASM coordinates to match rotated image.
  */
-double Face::computeGlobalCorrelation(Mat A, Mat B) {
-	double sumAB = 0.0;
-	vector<double> localMax;
+Point Face::rotatePoint(Point pt, double angle) {
 
-	cv::resize(A, B, A.size(), 0, 0, cv::INTER_CUBIC);
+	angle = angle / (180 / CV_PI); // convert angle to rad
 
-	vector<Mat> subRegionsOfA = divideIntoSubRegions(A);
-	vector<Mat> subRegionsOfB = divideIntoSubRegions(B);
+	Point center = Point(face.cols * 0.5, face.rows * 0.5);
+	Point midpoint = Point(pt.x - center.x, pt.y - center.y);
 
-	unsigned int regionsPerLine = div(A.cols, 8).quot;
+	pt.x = (midpoint.x * cos(angle)) - (midpoint.y * sin(angle));
+	pt.y = (midpoint.x * sin(angle)) + (midpoint.y * cos(angle));
 
-	cout << "regionsPerLine = " << regionsPerLine << endl;
+	pt.x = (int) ceil(pt.x) + center.x;
+	pt.y = (int) ceil(pt.y) + center.y;
 
-	for (unsigned int i = 0; i < subRegionsOfA.size(); i++) {
-		localMax.clear();
-
-		if (i == 0) {
-			/**
-			 * ____
-			 * |__|
-			 *
-			 */
-//			cout << "i = 0 " << endl;
-//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
-			localMax.push_back(
-					computeLocalCorrelation(subRegionsOfA.at(i),
-							subRegionsOfB.at(i)));
-		} else if (i > 0 && i < regionsPerLine) {
-
-			/**
-			 * ______
-			 * |__|__|
-			 *
-			 */
-//			cout << "i > 0 && i < regionsPerLine " << endl;
-//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
-			localMax.push_back(
-					computeLocalCorrelation(subRegionsOfA.at(i),
-							subRegionsOfB.at(i)));
-//			cout << "A comparar a região i(" << i << ") com a região i(" << (i-1) << ") => " << computelocalCorrelation(subRegionsOfA.at(i),
-//					subRegionsOfB.at(i - 1)) << endl;
-			localMax.push_back(
-					computeLocalCorrelation(subRegionsOfA.at(i),
-							subRegionsOfB.at(i - 1)));
-		} else if (i % regionsPerLine == 0) {
-			/**
-			 * ____
-			 * |__|
-			 * |__|
-			 *
-			 */
-//			cout << "i > 0 && i < regionsPerLine " << endl;
-//			cout << "A comparar a região i(" << i << ") com a região i-regionsPerLine(" << (i-regionsPerLine) << ") --> " << computelocalCorrelation(subRegionsOfA.at(i),
-//					subRegionsOfB.at(i - regionsPerLine)) << endl;
-			localMax.push_back(
-					computeLocalCorrelation(subRegionsOfA.at(i),
-							subRegionsOfB.at(i - regionsPerLine)));
-//			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") --> " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
-			localMax.push_back(
-					computeLocalCorrelation(subRegionsOfA.at(i),
-							subRegionsOfB.at(i)));
-		} else {
-			/**
-			 * ______
-			 * |__|__|
-			 * |__|__|
-			 *
-			 */
-
-//			cout << "i > 0 && i < regionsPerLine " << endl;
-//			cout << "A comparar a região " << i << " com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
-			localMax.push_back(
-					computeLocalCorrelation(subRegionsOfA.at(i),
-							subRegionsOfB.at(i)));
-//			cout << "A comparar a região " << i << " com a região i-1(" << (i - 1) << ") => " << computelocalCorrelation(subRegionsOfA.at(i),
-//					subRegionsOfB.at(i - 1)) << endl;
-			localMax.push_back(
-					computeLocalCorrelation(subRegionsOfA.at(i),
-							subRegionsOfB.at(i - 1)));
-//			cout << "A comparar a região " << i << " com a região i - regionsPerLine(" << i - regionsPerLine << ")" << endl;
-			localMax.push_back(
-					computeLocalCorrelation(subRegionsOfA.at(i),
-							subRegionsOfB.at(i - regionsPerLine)));
-//			cout << "A comparar a região " << i << " com a região i - regionsPerLine + 1 (" << (i - regionsPerLine + 1) << ")" << endl;
-			localMax.push_back(
-					computeLocalCorrelation(subRegionsOfA.at(i),
-							subRegionsOfB.at(i - regionsPerLine + 1)));
-		}
-		//somar máximos locais
-		sumAB += *max_element(localMax.begin(), localMax.end());
-	}
-	cout << "SumAB = " << sumAB << endl;
-	cout << "subRegionsOfA.size() = " << subRegionsOfA.size() << endl;
-	cout << "global corr mean = " << sumAB / (double) subRegionsOfA.size()
-			<< endl;
-
-	return sumAB;
+	return pt;
 }
 
 IplImage* Face::Rgb2Gray(IplImage *src) {
