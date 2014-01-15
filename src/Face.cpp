@@ -10,41 +10,42 @@
 
 #include "Face.h"
 
-Face::Face(const char* imgPath) {
+Face::Face(const char* path) {
 
 	if (!stasm_init("data", 0 /*trace*/))
 		error("stasm_init failed: ", stasm_lasterr());
 
-	cv::Mat_<unsigned char> img(cv::imread(imgPath, CV_LOAD_IMAGE_GRAYSCALE));
-//	resize(img, img, Size(250, 250)); // image resizing for better performance
+	cv::Mat_<unsigned char> img(cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE));
 
 	if (!img.data)
-		error("Cannot load", imgPath);
+		error("Cannot load", path);
 
-	if (!stasm_open_image((const char*) img.data, img.cols, img.rows, imgPath,
+	if (!stasm_open_image((const char*) img.data, img.cols, img.rows, path,
 			1 /*multiface*/, 10 /*minwidth*/))
 		error("stasm_open_image failed: ", stasm_lasterr());
 
 	int foundface;
 	float landmarks[2 * stasm_NLANDMARKS]; // x,y coords (note the 2)
 
-	int nfaces = 0;
-	while (1) {
-		if (!stasm_search_auto(&foundface, landmarks))
-			error("stasm_search_auto failed: ", stasm_lasterr());
-		if (!foundface)
-			break;      // note break
-		stasm_convert_shape(landmarks, 68);
+	if (!stasm_search_single(&foundface, landmarks, (char*) img.data, img.cols,
+			img.rows, path, "../data")) {
+		printf("Error in stasm_search_single: %s\n", stasm_lasterr());
+		exit(1);
+	}
 
-		int i = 0;
-		for (i = 0; i < stasm_NLANDMARKS; i++) {
+	if (!foundface)
+		printf("No face found in %s\n", path);
+	else {
+		// draw the landmarks on the image as white dots
+		stasm_force_points_into_image(landmarks, img.cols, img.rows);
+		stasm_convert_shape(landmarks, 68);
+		for (int i = 0; i < 68; i++) {
 			stasmPts.push_back(
 					Point(cvRound(landmarks[i * 2]),
 							cvRound(landmarks[i * 2 + 1])));
 		}
 	}
 	this->face = img;
-	nfaces++;
 }
 
 /**
@@ -89,12 +90,20 @@ Point Face::rotatePoint(Point pt, double angle) {
 /**
  * Illumination correction using the SQI algorithm.
  */
-Mat Face::normalizeIllumination(Mat face)
-{
+Mat Face::normalizeIllumination(Mat face) {
 	IplImage copy = face;
 	Mat sqiImg = Mat(SQI(&copy));
 
 	return sqiImg;
+}
+
+/**
+ * Get STASM points array from image.
+ */
+vector<Point> Face::getStasmPts() {
+
+	cout << stasmPts.size() << endl;
+	return this->stasmPts;
 }
 
 /**
@@ -105,8 +114,7 @@ Mat Face::normalizeIllumination(Mat face)
  * 3)
  */
 Mat Face::normalizePose(Mat face, Point lPupil, Point rPupil,
-		Point lEyebrowInner, Point noseTip, Point noseBase,
-		Point tipOfChin) {
+		Point lEyebrowInner, Point noseTip, Point noseBase, Point tipOfChin) {
 
 	double theta = computePointsAngle(lPupil, rPupil);
 	face = rotateImage(face, theta);
@@ -124,27 +132,38 @@ Mat Face::normalizePose(Mat face, Point lPupil, Point rPupil,
 	double dl = cv::norm(lPupil - noseTip);
 	double dr = cv::norm(rPupil - noseTip);
 	int x1, y1, x2, y2;
+	Mat crop;
 
-	if (gsl_fcmp(dl, dr, DBL_EPSILON) > 0) { // x = y returns 0; if x < y returns -1; x > y returns +1;
-		flip(face, face, 1);
-		for (unsigned int i = 0; i < 68; i++) {
-			stasmPts.at(i) = Point(face.cols - stasmPts.at(i).x,
-					stasmPts.at(i).y);
+	try {
+
+		if (gsl_fcmp(dl, dr, DBL_EPSILON) > 0) { // x = y returns 0; if x < y returns -1; x > y returns +1;
+			flip(face, face, 1);
+			for (unsigned int i = 0; i < 68; i++) {
+				stasmPts.at(i) = Point(face.cols - stasmPts.at(i).x,
+						stasmPts.at(i).y);
+			}
+
+			for (unsigned int i = 0; i < stasmPts.size(); i++) {
+				cout << i << " - " << stasmPts.at(i) << endl;
+			}
+
+			x1 = stasmPts.at(13).x;
+			x2 = stasmPts.at(1).x;
+		} else {
+			x1 = stasmPts.at(1).x;
+			x2 = stasmPts.at(13).x;
 		}
-		x1 = stasmPts.at(13).x;
-		x2 = stasmPts.at(1).x;
-	} else {
-		x1 = stasmPts.at(1).x;
-		x2 = stasmPts.at(13).x;
+
+		y1 = stasmPts.at(23).y - 40;
+		y2 = stasmPts.at(7).y + 5;
+
+		int width = abs(x1 - x2);
+		int height = abs(y2 - y1);
+
+		crop = face(Rect(x1, y1, width, height));
+	} catch (exception& e) {
+		cout << "Unable to crop face - Exception: " << e.what() << endl;
 	}
-
-	y1 = stasmPts.at(23).y - 20;
-	y2 = stasmPts.at(7).y + 5;
-
-	int width = abs(x1 - x2);
-	int height = abs(y2 - y1);
-
-	Mat crop = face(Rect(x1, y1, width, height));
 
 	noseTip = Point(stasmPts.at(67).x - x1, stasmPts.at(67).y - y1); //82,121
 	Point noseTop = calcMidpoint(stasmPts.at(24).x - x1, stasmPts.at(24).y - y1,
@@ -166,7 +185,7 @@ Mat Face::normalizePose(Mat face, Point lPupil, Point rPupil,
 	Mat band3 = correctBandPerpective(crop, noseTip, noseBase,
 			Point(crop.cols - (abs(noseTip.x - noseBase.x)), noseBase.y));
 	Mat band4 = correctBandPerpective(crop, noseBase, lipTop,
-			Point(crop.cols - (abs(noseBase.x - lipTop.x) + 2), lipTop.y));
+			Point(crop.cols - (abs(noseBase.x - lipTop.x)), lipTop.y));
 	Mat band5 = correctBandPerpective(crop, lipTop, lipBottom,
 			Point(crop.cols - (abs(lipTop.x - lipBottom.x)), lipBottom.y));
 	Mat band6 = correctBandPerpective(crop, lipBottom, chinTip,
@@ -201,6 +220,8 @@ Mat Face::normalizePose(Mat face, Point lPupil, Point rPupil,
 				mirror.at<uchar>(row, col) = stretch.at<uchar>(row, col - 1);
 		}
 	}
+
+	resize(mirror, mirror, Size(200, 240)); // image resizing for better performance
 
 	return mirror;
 }
@@ -469,14 +490,6 @@ Point Face::calcMidpoint(double x1, double y1, double x2, double y2) {
 }
 
 /**
- * Get STASM points array from image.
- */
-vector<Point> Face::getStasmPts() {
-
-	return this->stasmPts;
-}
-
-/**
  * Calculates the average value of the pixels of a matrix.
  */
 double Face::computePixelsMean(Mat img) {
@@ -522,22 +535,24 @@ vector<Mat> Face::divideIntoSubRegions(Mat region) {
 /**
  * Calculates the correlation between two cv::Mat.
  */
-double Face::computelocalCorrelation(Mat rA, Mat rB) {
+double Face::computeLocalCorrelation(Mat A, Mat B) {
 
-	double rAPixMean = computePixelsMean(rA);
-	double rBPixMean = computePixelsMean(rB);
+	double aPixMean = computePixelsMean(A);
+	cout << "aPixMean = " << aPixMean << endl;
+	double bPixMean = computePixelsMean(B);
+	cout << "bPixMean = " << bPixMean << endl;
 
 	double sum1 = 0.0;
 	double sum2 = 0.0;
 	double sum3 = 0.0;
 
-	for (int j = 0; j < rA.rows; j++) {
-		for (int i = 0; i < rA.cols; i++) {
+	for (int i = 0; i < A.cols; i++) {
+		for (int j = 0; j < A.rows; j++) {
 
-			sum1 += (rA.at<uchar>(j, i) - rAPixMean)
-					* (rB.at<uchar>(j, i) - rBPixMean);
-			sum2 += pow(rA.at<uchar>(j, i) - rAPixMean, 2.0);
-			sum3 += pow(rB.at<uchar>(j, i) - rBPixMean, 2.0);
+			sum1 += (A.at<uchar>(i, j) - aPixMean)
+					* (B.at<uchar>(i, j) - bPixMean);
+			sum2 += pow(A.at<uchar>(i, j) - aPixMean, 2.0);
+			sum3 += pow(B.at<uchar>(i, j) - bPixMean, 2.0);
 		}
 	}
 
@@ -575,7 +590,8 @@ double Face::computeGlobalCorrelation(Mat A, Mat B) {
 //			cout << "i = 0 " << endl;
 //			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
 			localMax.push_back(
-					computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i)));
 		} else if (i > 0 && i < regionsPerLine) {
 
 			/**
@@ -586,11 +602,12 @@ double Face::computeGlobalCorrelation(Mat A, Mat B) {
 //			cout << "i > 0 && i < regionsPerLine " << endl;
 //			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
 			localMax.push_back(
-					computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i)));
 //			cout << "A comparar a região i(" << i << ") com a região i(" << (i-1) << ") => " << computelocalCorrelation(subRegionsOfA.at(i),
 //					subRegionsOfB.at(i - 1)) << endl;
 			localMax.push_back(
-					computelocalCorrelation(subRegionsOfA.at(i),
+					computeLocalCorrelation(subRegionsOfA.at(i),
 							subRegionsOfB.at(i - 1)));
 		} else if (i % regionsPerLine == 0) {
 			/**
@@ -603,11 +620,12 @@ double Face::computeGlobalCorrelation(Mat A, Mat B) {
 //			cout << "A comparar a região i(" << i << ") com a região i-regionsPerLine(" << (i-regionsPerLine) << ") --> " << computelocalCorrelation(subRegionsOfA.at(i),
 //					subRegionsOfB.at(i - regionsPerLine)) << endl;
 			localMax.push_back(
-					computelocalCorrelation(subRegionsOfA.at(i),
+					computeLocalCorrelation(subRegionsOfA.at(i),
 							subRegionsOfB.at(i - regionsPerLine)));
 //			cout << "A comparar a região i(" << i << ") com a região i(" << i << ") --> " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
 			localMax.push_back(
-					computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i)));
 		} else {
 			/**
 			 * ______
@@ -617,22 +635,22 @@ double Face::computeGlobalCorrelation(Mat A, Mat B) {
 			 */
 
 //			cout << "i > 0 && i < regionsPerLine " << endl;
-
 //			cout << "A comparar a região " << i << " com a região i(" << i << ") => " << computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)) << endl;
 			localMax.push_back(
-					computelocalCorrelation(subRegionsOfA.at(i), subRegionsOfB.at(i)));
+					computeLocalCorrelation(subRegionsOfA.at(i),
+							subRegionsOfB.at(i)));
 //			cout << "A comparar a região " << i << " com a região i-1(" << (i - 1) << ") => " << computelocalCorrelation(subRegionsOfA.at(i),
 //					subRegionsOfB.at(i - 1)) << endl;
 			localMax.push_back(
-					computelocalCorrelation(subRegionsOfA.at(i),
+					computeLocalCorrelation(subRegionsOfA.at(i),
 							subRegionsOfB.at(i - 1)));
 //			cout << "A comparar a região " << i << " com a região i - regionsPerLine(" << i - regionsPerLine << ")" << endl;
 			localMax.push_back(
-					computelocalCorrelation(subRegionsOfA.at(i),
+					computeLocalCorrelation(subRegionsOfA.at(i),
 							subRegionsOfB.at(i - regionsPerLine)));
 //			cout << "A comparar a região " << i << " com a região i - regionsPerLine + 1 (" << (i - regionsPerLine + 1) << ")" << endl;
 			localMax.push_back(
-					computelocalCorrelation(subRegionsOfA.at(i),
+					computeLocalCorrelation(subRegionsOfA.at(i),
 							subRegionsOfB.at(i - regionsPerLine + 1)));
 		}
 		//somar máximos locais
@@ -640,7 +658,8 @@ double Face::computeGlobalCorrelation(Mat A, Mat B) {
 	}
 	cout << "SumAB = " << sumAB << endl;
 	cout << "subRegionsOfA.size() = " << subRegionsOfA.size() << endl;
-	cout << "global corr mean = " << sumAB / (double)subRegionsOfA.size() << endl;
+	cout << "global corr mean = " << sumAB / (double) subRegionsOfA.size()
+			<< endl;
 
 	return sumAB;
 }
