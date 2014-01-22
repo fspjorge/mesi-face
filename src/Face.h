@@ -49,7 +49,7 @@ private:
 	IplImage* SQI(IplImage* inp);
 	//aux functions
 	double computePixelsMean(Mat img);
-	vector<Mat> divideIntoSubRegions(Mat region);
+	vector<Mat> divideIntoSubRegions(Mat region, int size);
 	Point rotatePoint(Point pt, double angle);
 	double computePointsAngle(Point pt1, Point pt2);
 	Mat rotateImage(const Mat& source, double angle);
@@ -65,6 +65,7 @@ public:
 	Face(const char* imgPath);
 	double computeLocalCorrelation(Mat rA, Mat rB);
 	double computeGlobalCorrelation(Mat A, Mat B);
+	double computeGlobalCorrelation2(Mat A, Mat B);
 	vector<Point> getStasmPts();
 	double computeSp(Point LPupil, Point RPupil, Point LEyebrowInner,
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
