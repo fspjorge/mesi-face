@@ -19,9 +19,9 @@ int main() {
 	clock_t time = clock();
 
 	//FACE 1
-	static const char* imgPath = "img/beard-face.jpg";
+	static const char* imgPath = "76151202.jpg";
 	Face face = Face(imgPath);
-	Mat img = face.loadMat();
+	Mat img1 = face.loadMat();
 	vector<Point> stasmPtsVector = face.getStasmPts();
 
 	Point lPupil = stasmPtsVector.at(31);
@@ -31,24 +31,23 @@ int main() {
 	Point noseBase = stasmPtsVector.at(41);
 	Point tipOfChin = stasmPtsVector.at(7);
 
-	cout << "Image 1 #############################" << endl;
+	cout << "Candidate | ";
 
 	// Compute SP and SI
 	double sp = face.computeSp(lPupil, rPupil, lEyebrowInner, noseTip, noseBase,
 			tipOfChin);
-	cout << "SP1 = " << sp << endl;
+	cout << "SP1 = " << sp << " | ";
 	double si = face.computeSi(lPupil, rPupil, lEyebrowInner, noseTip, noseBase,
 			tipOfChin);
-	cout << "SI1 = " << si << endl;
+	cout << "SI1 = " << si << " | ";
+	cout << imgPath << endl << "-----------------------------------------------------------------------------------------------------------------" << endl;
 
 	// 4. A), B), C), D) and E) Pose Normalization
-	img = face.normalizePose(img, lPupil, rPupil, lEyebrowInner, noseTip,
+	img1 = face.normalizePose(img1, lPupil, rPupil, lEyebrowInner, noseTip,
 			noseBase, tipOfChin);
 
 	// 4.F) Illumination Normalization
-	img = face.normalizeIllumination(img);
-
-	imshow("illumination norm with SQI", img);
+//	img1 = face.normalizeIllumination(img1);
 
 	//percorrer todas as imagens de uma pasta
 
@@ -59,25 +58,22 @@ int main() {
 	typedef std::multimap<std::time_t, fs::path> result_set_t;
 	result_set_t result_set;
 
+	int count = 2;
 	if (fs::exists(someDir) && fs::is_directory(someDir)) {
 		for (fs::directory_iterator dir_iter(someDir); dir_iter != end_iter;
 				++dir_iter) {
 			if (fs::is_regular_file(dir_iter->status())) {
-
-				cout << dir_iter->path().filename().extension() << endl;
-
 				if (dir_iter->path().filename().extension() == ".jpg") {
-					cout << "Image 2 #############################" << endl;
-					cout << dir_iter->path().filename() << endl;
+					cout << "Image " << count << " | ";
 					// FACE 2
 					string root =
 							"/home/jorge/workspace/dissertacao/img/";
 					string imgPath2 =
 							dir_iter->path().filename().string().c_str();
-					string total = root + imgPath2;
-					Face face2 = Face(total.c_str());
-					Mat img2 = face2.loadMat();
-					vector<Point> stasmPtsVector2 = face2.getStasmPts();
+					string absPath = root + imgPath2;
+					face = Face(absPath.c_str());
+					Mat img2 = face.loadMat();
+					vector<Point> stasmPtsVector2 = face.getStasmPts();
 
 					Point lPupil2 = stasmPtsVector2.at(31);
 					Point rPupil2 = stasmPtsVector2.at(36);
@@ -87,33 +83,30 @@ int main() {
 					Point tipOfChin2 = stasmPtsVector2.at(7);
 
 					// Compute SP and SI
-					double sp2 = face2.computeSp(lPupil2, rPupil2,
+					double sp2 = face.computeSp(lPupil2, rPupil2,
 							lEyebrowInner2, noseTip2, noseBase2, tipOfChin2);
-					cout << "SP2 = " << sp2 << endl;
-					double si2 = face2.computeSi(lPupil2, rPupil2,
+					cout << "SP2 = " << sp2 <<  " | ";
+					double si2 = face.computeSi(lPupil2, rPupil2,
 							lEyebrowInner2, noseTip2, noseBase2, tipOfChin2);
-					cout << "SI2 = " << si2 << endl;
+					cout << "SI2 = " << si2 <<  " | ";
 
 					// 4. A), B), C), D) and E) Pose Normalization
-					img2 = face2.normalizePose(img2, lPupil2, rPupil2,
+					img2 = face.normalizePose(img2, lPupil2, rPupil2,
 							lEyebrowInner2, noseTip2, noseBase2, tipOfChin2);
 
 					// 4.F) Illumination Normalization
-//				img2 = face2.normalizeIllumination(img2);
+//					img2 = face.normalizeIllumination(img2);
 
-					imshow("illumination norm with SQI2", img2);
-
-					double corr = face.computeLocalCorrelation(img, img2);
+					double localCorr = face.computeLocalCorrelation(img1, img2);
+					double corr = face.computeGlobalCorrelation2(img1, img2);
 
 					// COMPARAÇÃO DAS DUAS IMAGENS	cout << "localCorr = " << face.computelocalCorrelation(img, img2) << endl;
-					cout << "globalCorr = " << corr << endl;
+					cout << "globalCorr = " << corr <<  " | ";
+					cout << "localCorr = " << localCorr <<  " | ";
 
-					if (corr < 0.4) {
-						cout << "Authentication rejected!" << endl;
-					} else {
-						cout << "Authentication accepted!" << endl;
-					}
+					cout << dir_iter->path().filename() << endl;
 				}
+				count++;
 			}
 		}
 	}
