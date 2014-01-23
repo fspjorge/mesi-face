@@ -180,7 +180,7 @@ Mat Face::normalizePose(Mat face, Point lPupil, Point rPupil,
 		}
 	}
 
-	resize(mirror, mirror, Size(80, 80)); // image resizing for better performance
+	resize(mirror, mirror, Size(200, 240)); // image resizing for better performance
 
 	return mirror;
 }
@@ -304,44 +304,43 @@ double Face::computeSi(Point LPupil, Point RPupil, Point LEyebrowInner,
 }
 
 /**
- * Calculates the correlation between two cv::Mat.
+ * Computes the correlation between two cv::Mat.
  */
-double Face::computeLocalCorrelation(Mat A, Mat B) {
+double Face::computeLocalCorrelation(Mat image1, Mat image2) {
 
-	double aPixMean = computePixelsMean(A);
-	double bPixMean = computePixelsMean(B);
+	double img1PixMean = computePixelsMean(image1);
+	double img2PixMean = computePixelsMean(image2);
 
 	double sum1 = 0.0;
 	double sum2 = 0.0;
 	double sum3 = 0.0;
 
-	for (int i = 0; i < A.cols; i++) {
-		for (int j = 0; j < A.rows; j++) {
+	for (int i = 0; i < image1.cols; i++) {
+		for (int j = 0; j < image1.rows; j++) {
 
-			sum1 += (A.at<uchar>(i, j) - aPixMean)
-					* (B.at<uchar>(i, j) - bPixMean);
-			sum2 += pow(A.at<uchar>(i, j) - aPixMean, 2.0);
-			sum3 += pow(B.at<uchar>(i, j) - bPixMean, 2.0);
+			sum1 += (image1.at<uchar>(i, j) - img1PixMean)
+					* (image2.at<uchar>(i, j) - img2PixMean);
+			sum2 += pow(image1.at<uchar>(i, j) - img1PixMean, 2.0);
+			sum3 += pow(image2.at<uchar>(i, j) - img2PixMean, 2.0);
 		}
 	}
 
-	double corr = sum1 / (sqrt(sum2 * sum3));
-//	cout << "corrLocal = " << corr << endl;
+	double correlation = sum1 / (sqrt(sum2 * sum3));
 
-	return corr;
+	return correlation;
 }
 
 /**
  * Soma dos máximos das subregiões (WORK IN PROGRESS).
  */
-double Face::computeGlobalCorrelation(Mat A, Mat B) {
+double Face::computeGlobalCorrelation(Mat image1, Mat image2) {
 
 	double sum = 0.0;
 	vector<double> localMax;
 	int size = 20;
-	vector<Mat> subRegionsOfA = divideIntoSubRegions(A, size);
-	vector<Mat> subRegionsOfB = divideIntoSubRegions(B, size);
-	unsigned int nCols = div(A.cols, size).quot; // 10
+	vector<Mat> subRegionsOfA = divideIntoSubRegions(image1, size);
+	vector<Mat> subRegionsOfB = divideIntoSubRegions(image2, size);
+	unsigned int nCols = div(image1.cols, size).quot; // 10
 	int count = 0;
 	int count2 = 0;
 	int count3 = 0;
@@ -566,15 +565,13 @@ double Face::computeGlobalCorrelation2(Mat regionA, Mat regionB) {
 
 			Mat subRegionA = regionA(Rect(k, l, size, size));
 
-			for (int u = -size; u <= size; u+=size) {
-				for (int v = -size; v <= size; v+=size) {
-
-					cout << "(k + size, l + size)=(" << k + size << "," << l + size << "|";
-
+			for (int u = -size; u <= size; u += size) {
+				for (int v = -size; v <= size; v += size) {
 					Rect rect(cv::Point(), regionB.size());
 					Point p(k + u, l + v);
 
 					if (rect.contains(p)) {
+
 						Mat subRegionB = regionB(Rect(p.x, p.y, size, size));
 						localMax.push_back(
 								computeLocalCorrelation(subRegionA,
@@ -591,10 +588,10 @@ double Face::computeGlobalCorrelation2(Mat regionA, Mat regionB) {
 		}
 	}
 
-	cout << "count = " << count << " | ";
-	cout << "count2 = " << count2 << " | ";
+        cout << "count = " << count << " | ";
+        cout << "count2 = " << count2 << " | ";
 
-	return sum / count;
+        return sum / count;
 }
 
 /**
