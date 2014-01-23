@@ -555,7 +555,7 @@ double Face::computeGlobalCorrelation(Mat A, Mat B) {
  * Soma dos máximos das subregiões (WORK IN PROGRESS).
  */
 double Face::computeGlobalCorrelation2(Mat regionA, Mat regionB) {
-	double sumAB = 0.0;
+	double sum = 0.0;
 	vector<double> localMax;
 	int size = 20;
 	int count = 0;
@@ -564,81 +564,18 @@ double Face::computeGlobalCorrelation2(Mat regionA, Mat regionB) {
 	for (int k = 0; k < regionA.cols; k += size) {
 		for (int l = 0; l < regionA.rows; l += size) {
 
-			Mat subRegionA = regionA(Rect(k, l, size, size)); // primeiro elemento para comparar
+			Mat subRegionA = regionA(Rect(k, l, size, size));
 
-//			for (int u = -size; u <= size; u++) {
-//				for (int v = -size; v <= size; v++) {
+			for (int u = -size; u <= size; u+=size) {
+				for (int v = -size; v <= size; v+=size) {
+
+					cout << "(k + size, l + size)=(" << k + size << "," << l + size << "|";
 
 					Rect rect(cv::Point(), regionB.size());
+					Point p(k + u, l + v);
 
-					Point p1(k - size, l - size);
-					Point p2(k, l - size);
-					Point p3(k + size, l - size);
-					Point p4(k - size, l);
-					Point p5(k, l);
-					Point p6(k + size, l);
-					Point p7(k - size, l + size);
-					Point p8(k, l + size);
-					Point p9(k + size, l + size);
-
-					if (rect.contains(p1)) {
-						Mat subRegionB = regionB(Rect(p1.x, p1.y, size, size));
-						localMax.push_back(
-								computeLocalCorrelation(subRegionA,
-										subRegionB));
-						count2++;
-					}
-					if (rect.contains(p2)) {
-						Mat subRegionB = regionB(Rect(p2.x, p2.y, size, size));
-						localMax.push_back(
-								computeLocalCorrelation(subRegionA,
-										subRegionB));
-						count2++;
-					}
-					if (rect.contains(p3)) {
-						Mat subRegionB = regionB(Rect(p3.x, p3.y, size, size));
-						localMax.push_back(
-								computeLocalCorrelation(subRegionA,
-										subRegionB));
-						count2++;
-					}
-					if (rect.contains(p4)) {
-						Mat subRegionB = regionB(Rect(p4.x, p4.y, size, size));
-						localMax.push_back(
-								computeLocalCorrelation(subRegionA,
-										subRegionB));
-						count2++;
-					}
-					if (rect.contains(p5)) {
-						Mat subRegionB = regionB(Rect(p5.x, p5.y, size, size));
-						localMax.push_back(
-								computeLocalCorrelation(subRegionA,
-										subRegionB));
-						count2++;
-					}
-					if (rect.contains(p6)) {
-						Mat subRegionB = regionB(Rect(p6.x, p6.y, size, size));
-						localMax.push_back(
-								computeLocalCorrelation(subRegionA,
-										subRegionB));
-						count2++;
-					}
-					if (rect.contains(p7)) {
-						Mat subRegionB = regionB(Rect(p7.x, p7.y, size, size));
-						localMax.push_back(
-								computeLocalCorrelation(subRegionA,
-										subRegionB));
-						count2++;
-					}
-					if (rect.contains(p8)) {
-						Mat subRegionB = regionB(Rect(p8.x, p8.y, size, size));
-						localMax.push_back(
-								computeLocalCorrelation(subRegionA,
-										subRegionB));
-						count2++;
-					}
-					if (rect.contains(p9)) {
-						Mat subRegionB = regionB(Rect(p9.x, p9.y, size, size));
+					if (rect.contains(p)) {
+						Mat subRegionB = regionB(Rect(p.x, p.y, size, size));
 						localMax.push_back(
 								computeLocalCorrelation(subRegionA,
 										subRegionB));
@@ -647,17 +584,17 @@ double Face::computeGlobalCorrelation2(Mat regionA, Mat regionB) {
 				}
 			}
 			if (!localMax.empty()) {
-				sumAB += *max_element(localMax.begin(), localMax.end());
-				localMax.clear();
+				sum += *max_element(localMax.begin(), localMax.end());
 				count++;
-//			}
-//		}
+				localMax.clear();
+			}
+		}
 	}
-	cout << "count2 = " << count2 << " | ";
 
 	cout << "count = " << count << " | ";
+	cout << "count2 = " << count2 << " | ";
 
-	return sumAB / count;
+	return sum / count;
 }
 
 /**
@@ -880,7 +817,7 @@ Point Face::rotatePoint(Point pt, double angle) {
 	return pt;
 }
 
-IplImage* Face::Rgb2Gray(IplImage *src) {
+IplImage * Face::Rgb2Gray(IplImage * src) {
 	IplImage *result;
 	int i, j;
 
@@ -912,7 +849,7 @@ IplImage* Face::Rgb2Gray(IplImage *src) {
 	return result;
 }
 
-CvMat* Face::IplImage2Mat(IplImage *inp_img) {
+CvMat * Face::IplImage2Mat(IplImage * inp_img) {
 
 	CvMat *result;
 	IplImage *temp;
@@ -1007,7 +944,7 @@ int Face::Scale_Mat(CvMat *input, double scale) {
 	return 1;
 }
 
-CvMat* Face::Weighted_Gaussian(CvMat *inp, CvMat *gaussian) {
+CvMat * Face::Weighted_Gaussian(CvMat * inp, CvMat * gaussian) {
 	double sum;
 	double threshold;
 	int i, j;
@@ -1127,7 +1064,7 @@ CvMat* Face::Get_Mat(CvPoint a, int width, int height, IplImage *image) {
 /**
  *
  */
-CvMat* Face::Conv_Weighted_Gaussian(IplImage *inp_img, CvMat *kernel) {
+CvMat * Face::Conv_Weighted_Gaussian(IplImage * inp_img, CvMat * kernel) {
 //IplImage *result;
 	int i, j;
 	CvPoint start;
@@ -1192,7 +1129,7 @@ CvMat* Face::Gaussian(int size) {
 	return res;
 }
 
-IplImage* Face::SQI(IplImage* inp) {
+IplImage * Face::SQI(IplImage * inp) {
 	int num_filters;
 	int size[3];
 //	IplImage *ttt;
