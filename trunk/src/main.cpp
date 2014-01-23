@@ -36,10 +36,10 @@ int main() {
 	// Compute SP and SI
 	double sp = face.computeSp(lPupil, rPupil, lEyebrowInner, noseTip, noseBase,
 			tipOfChin);
-	cout << "SP1 = " << sp << " | ";
+	cout << "SP = " << sp << " | ";
 	double si = face.computeSi(lPupil, rPupil, lEyebrowInner, noseTip, noseBase,
 			tipOfChin);
-	cout << "SI1 = " << si << " | ";
+	cout << "SI = " << si << " | ";
 	cout << imgPath << endl << "-----------------------------------------------------------------------------------------------------------------" << endl;
 
 	// 4. A), B), C), D) and E) Pose Normalization
@@ -85,10 +85,10 @@ int main() {
 					// Compute SP and SI
 					double sp2 = face.computeSp(lPupil2, rPupil2,
 							lEyebrowInner2, noseTip2, noseBase2, tipOfChin2);
-					cout << "SP2 = " << sp2 <<  " | ";
+					cout << "SP = " << sp2 <<  " | ";
 					double si2 = face.computeSi(lPupil2, rPupil2,
 							lEyebrowInner2, noseTip2, noseBase2, tipOfChin2);
-					cout << "SI2 = " << si2 <<  " | ";
+					cout << "SI = " << si2 <<  " | ";
 
 					// 4. A), B), C), D) and E) Pose Normalization
 					img2 = face.normalizePose(img2, lPupil2, rPupil2,
