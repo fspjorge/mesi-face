@@ -19,11 +19,12 @@ int main() {
 	clock_t time = clock();
 
 	//FACE 1
-	static const char* imgPath = "BioID_0042.pgm";
+	static const char* imgPath = "templates_jorge/4_5.pgm";
 	Face face = Face(imgPath);
 	Mat img1 = face.loadMat();
 	vector<Point> stasmPtsVector = face.getStasmPts();
 	vector<string> filenames;
+	map<double, string> correlations_map;
 
 	Point lPupil = stasmPtsVector.at(31);
 	Point rPupil = stasmPtsVector.at(36);
@@ -49,13 +50,17 @@ int main() {
 	img1 = face.normalizePose(img1, lPupil, rPupil, lEyebrowInner, noseTip,
 			noseBase, tipOfChin);
 
-	// 4.F) Illumination Normalization
+//	imshow("img1_pose", img1);
+
+// 4.F) Illumination Normalization
 	img1 = face.normalizeIllumination(img1);
 
-	//percorrer todas as imagens de uma pasta
+//	imshow("img1_ill", img1);
+
+//percorrer todas as imagens de uma pasta
 
 	namespace fs = boost::filesystem;
-	fs::path someDir("/home/jorge/workspace/dissertacao/img2");
+	fs::path someDir("/home/jorge/workspace/dissertacao/templates_jorge");
 	fs::directory_iterator end_iter;
 
 	typedef std::multimap<std::time_t, fs::path> result_set_t;
@@ -66,7 +71,8 @@ int main() {
 		for (fs::directory_iterator dir_iter(someDir); dir_iter != end_iter;
 				++dir_iter) {
 			if (fs::is_regular_file(dir_iter->status())) {
-				if (dir_iter->path().filename().extension() == ".pgm") {
+				if (dir_iter->path().filename().extension() == ".jpg"
+						|| dir_iter->path().filename().extension() == ".pgm") {
 
 					filenames.push_back(dir_iter->path().filename().string());
 				}
@@ -78,9 +84,9 @@ int main() {
 	std::sort(filenames.begin(), filenames.end());
 
 	for (unsigned f = 0; f < filenames.size(); f++) {
-		cout << "Image " << count << " | ";
+
 		// FACE 2
-		string root = "/home/jorge/workspace/dissertacao/img2/";
+		string root = "/home/jorge/workspace/dissertacao/templates_jorge/";
 		string imgPath2 = filenames.at(f).c_str();
 		string absPath = root + imgPath2;
 		face = Face(absPath.c_str());
@@ -94,6 +100,8 @@ int main() {
 		Point noseBase2 = stasmPtsVector2.at(41);
 		Point tipOfChin2 = stasmPtsVector2.at(7);
 
+		cout << filenames.at(f) << " | ";
+
 		// Compute SP and SI
 		double sp2 = face.computeSp(lPupil2, rPupil2, lEyebrowInner2, noseTip2,
 				noseBase2, tipOfChin2);
@@ -106,17 +114,35 @@ int main() {
 		img2 = face.normalizePose(img2, lPupil2, rPupil2, lEyebrowInner2,
 				noseTip2, noseBase2, tipOfChin2);
 
-		// 4.F) Illumination Normalization
-		img2 = face.normalizeIllumination(img2);
+//		imshow("img2_pose", img2);
 
-		double localCorr = face.computeLocalCorrelation(img1, img2);
-		double corr = face.computeGlobalCorrelation2(img1, img2);
+// 		4.F) Illumination Normalization
+		img2 = face.normalizeIllumination(img2);
+//		imshow("img2_illim", img2);
+
+//		double localCorrelation = face.computeLocalCorrelation(img1, img2);
+		double globalCorrelation = face.computeGlobalCorrelation(img1, img2);
+
+		correlations_map.insert(make_pair(globalCorrelation, filenames.at(f)));
 
 		// COMPARAÇÃO DAS DUAS IMAGENS  cout << "localCorr = " << face.computelocalCorrelation(img, img2) << endl;
-		cout << "globalCorr = " << corr << " | ";
-		cout << "localCorr = " << localCorr << " | ";
+		cout << "globalCorrelation = " << globalCorrelation << endl;
+//		cout << "localCorrelation = " << localCorrelation << endl;
+	}
 
-		cout << filenames.at(f) << endl;
+	/*
+	 * The list of computed values is organized in decreasing order.
+	 * Given the mean number n of templates per identity which are contained in the gallery,
+	 * the identity Ij with the maximum number of images in the first
+	 * n positions is returned. As a matter of fact, in an ideal situation,
+	 * all of the templates for the correct identity should appear in the
+	 * first positions of the ordered list.
+	 */
+	for (std::map<double, std::string>::reverse_iterator iter =
+			correlations_map.rbegin(); iter != correlations_map.rend();
+			++iter) {
+		cout << iter->first << ": ";
+		cout << iter->second << endl;
 	}
 
 	time = clock() - time;
