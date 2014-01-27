@@ -63,9 +63,11 @@ private:
 	vector<Point> getStasmPts(char* imgPath, int shape);
 public:
 	Face(const char* imgPath);
+	const Mat_<unsigned char>& loadMat() const {
+		return face;
+	}
 	double computeLocalCorrelation(Mat rA, Mat rB);
 	double computeGlobalCorrelation(Mat A, Mat B);
-	double computeGlobalCorrelation2(Mat A, Mat B);
 	vector<Point> getStasmPts();
 	double computeSp(Point LPupil, Point RPupil, Point LEyebrowInner,
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
@@ -74,9 +76,7 @@ public:
 	Mat normalizePose(Mat face, Point LPupil, Point RPupil, Point LEyebrowInner,
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
 	Mat normalizeIllumination(Mat face);
-	const Mat_<unsigned char>& loadMat() const {
-		return face;
-	}
+	double testAcceptance(Mat candidate);
 };
 
 #endif /* FACE_H_ */
