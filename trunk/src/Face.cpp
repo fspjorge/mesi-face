@@ -879,7 +879,7 @@ CvMat* Face::Gaussian(int size) {
 	double sigma;
 	int halfsize;
 
-	sigma = (double) size / 5;
+	sigma = (double) size / 10;
 	res = cvCreateMat(size, size, CV_64FC1);
 	halfsize = size / 2;
 
