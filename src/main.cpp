@@ -19,12 +19,12 @@ int main() {
 	clock_t time = clock();
 
 	//FACE 1
-	static const char* imgPath = "templates_jorge/4_5.pgm";
+	static const char* imgPath = "2014-01-29-222427.jpg";
 	Face face = Face(imgPath);
 	Mat img1 = face.loadMat();
 	vector<Point> stasmPtsVector = face.getStasmPts();
 	vector<string> filenames;
-	map<double, string> correlations_map;
+	map<double, string> correlationsMap;
 
 	Point lPupil = stasmPtsVector.at(31);
 	Point rPupil = stasmPtsVector.at(36);
@@ -55,7 +55,7 @@ int main() {
 // 4.F) Illumination Normalization
 	img1 = face.normalizeIllumination(img1);
 
-//	imshow("img1_ill", img1);
+	imshow("img1_ill", img1);
 
 //percorrer todas as imagens de uma pasta
 
@@ -122,12 +122,9 @@ int main() {
 
 //		double localCorrelation = face.computeLocalCorrelation(img1, img2);
 		double globalCorrelation = face.computeGlobalCorrelation(img1, img2);
+		cout << "global correlation = " << globalCorrelation << endl;
 
-		correlations_map.insert(make_pair(globalCorrelation, filenames.at(f)));
-
-		// COMPARAÇÃO DAS DUAS IMAGENS  cout << "localCorr = " << face.computelocalCorrelation(img, img2) << endl;
-		cout << "globalCorrelation = " << globalCorrelation << endl;
-//		cout << "localCorrelation = " << localCorrelation << endl;
+		correlationsMap.insert(make_pair(globalCorrelation, filenames.at(f)));
 	}
 
 	/*
@@ -139,7 +136,7 @@ int main() {
 	 * first positions of the ordered list.
 	 */
 	for (std::map<double, std::string>::reverse_iterator iter =
-			correlations_map.rbegin(); iter != correlations_map.rend();
+			correlationsMap.rbegin(); iter != correlationsMap.rend();
 			++iter) {
 		cout << iter->first << ": ";
 		cout << iter->second << endl;

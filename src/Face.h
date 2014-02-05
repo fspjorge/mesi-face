@@ -27,7 +27,6 @@
 #include <gsl/gsl_math.h>
 #include <errno.h>
 #include <ctime>
-#include <LibFace.h>
 #include <unistd.h>
 
 using namespace cv;
