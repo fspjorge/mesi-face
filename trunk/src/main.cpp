@@ -174,10 +174,15 @@ int main() {
 			dgG = 1 - iter->first; // compute the distance between p and gi|G| (dgG).
 		}
 
-		// compute Nb
+		/**
+		 * The second function φ2 (p) (density ratio) is computed using
+		 * the ratio between the number of subjects in the gallery, distinct
+		 * from the returned identity, giving a distance lower than twice
+		 * F(d(p, gi 1)), and the cardinality G of the gallery.
+		 */
 		if(1 - iter->first < 2*dg1)
 		{
-			nb = 1 - iter->first; // Nb = {gi k ∈ G|F (d(p, gi k )) < 2F (d(p, gi 1 ))}.
+			nb++;// = 1 - iter->first; // Nb = {gi k ∈ G|F (d(p, gi k )) < 2F (d(p, gi 1 ))}.
 		}
 	}
 
