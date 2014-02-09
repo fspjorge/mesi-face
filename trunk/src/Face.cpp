@@ -380,10 +380,10 @@ double Face::computeGlobalCorrelation(Mat regionA, Mat regionB) {
 }
 
 
-double testAcceptance(Mat candidate)
+double computeRelativeDistance(Mat p)
 {
-	// http://en.wikipedia.org/wiki/Receiver_operating_characteristic
-	// http://note.sonots.com/SciSoftware/haartraining.html
+
+
 
 	return 0.0;
 }

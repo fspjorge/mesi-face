@@ -75,7 +75,7 @@ public:
 	Mat normalizePose(Mat face, Point LPupil, Point RPupil, Point LEyebrowInner,
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
 	Mat normalizeIllumination(Mat face);
-	double testAcceptance(Mat candidate);
+	double computeRelativeDistance(Mat p);
 };
 
 #endif /* FACE_H_ */

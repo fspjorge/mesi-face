@@ -53,14 +53,15 @@ int main() {
 //	imshow("img1_pose", img1);
 
 // 4.F) Illumination Normalization
-	img1 = face.normalizeIllumination(img1);
+//	img1 = face.normalizeIllumination(img1);
 
-	imshow("img1_ill", img1);
+//	imshow("img1_ill", img1);
 
-//percorrer todas as imagens de uma pasta
-
+	/**
+	 * Iterate trough all the gallery templates.
+	 */
 	namespace fs = boost::filesystem;
-	fs::path someDir("/home/jorge/workspace/dissertacao/templates_jorge");
+	fs::path someDir("/home/jorge/workspace/dissertacao/templates");
 	fs::directory_iterator end_iter;
 
 	typedef std::multimap<std::time_t, fs::path> result_set_t;
@@ -86,7 +87,7 @@ int main() {
 	for (unsigned f = 0; f < filenames.size(); f++) {
 
 		// FACE 2
-		string root = "/home/jorge/workspace/dissertacao/templates_jorge/";
+		string root = "/home/jorge/workspace/dissertacao/templates/";
 		string imgPath2 = filenames.at(f).c_str();
 		string absPath = root + imgPath2;
 		face = Face(absPath.c_str());
@@ -117,7 +118,7 @@ int main() {
 //		imshow("img2_pose", img2);
 
 // 		4.F) Illumination Normalization
-		img2 = face.normalizeIllumination(img2);
+//		img2 = face.normalizeIllumination(img2);
 //		imshow("img2_illim", img2);
 
 //		double localCorrelation = face.computeLocalCorrelation(img1, img2);
@@ -135,12 +136,60 @@ int main() {
 	 * all of the templates for the correct identity should appear in the
 	 * first positions of the ordered list.
 	 */
-	for (std::map<double, std::string>::reverse_iterator iter =
+	double dg1 = 0;
+	double dg2 = 0;
+	double nb = 0;
+	double dgG = 0;
+	string sub_str;
+	size_t index;
+	string identityStr;
+
+	for (map<double, string>::reverse_iterator iter =
 			correlationsMap.rbegin(); iter != correlationsMap.rend();
 			++iter) {
 		cout << iter->first << ": ";
 		cout << iter->second << endl;
+
+		// compute the distance between p and gi1 (dg1).
+		if(dg1 == 0)
+		{
+			dg1 = 1 - iter->first;
+		}
+
+		// compute the distance between p and gi2 (dg2).
+		string str = iter->second;
+		index = str.find("_");
+		sub_str = str.substr (0, index);
+
+		if(identityStr.empty())
+		{
+			identityStr = sub_str;
+		}
+		else if(sub_str.compare(identityStr) != 0 && dg2 == 0)
+		{
+			dg2 = 1 - iter->first;
+		}
+		else
+		{
+			dgG = 1 - iter->first; // compute the distance between p and gi|G| (dgG).
+		}
+
+		// compute Nb
+		if(1 - iter->first < 2*dg1)
+		{
+			nb = 1 - iter->first; // Nb = {gi k ∈ G|F (d(p, gi k )) < 2F (d(p, gi 1 ))}.
+		}
 	}
+
+	double phi1 = (dg2 - dg1) / dgG;
+	double phi2 = 1 - (nb / correlationsMap.size());
+
+	cout << "dg1 = " << dg1 << endl;
+	cout << "dg2 = " << dg2 << endl;
+	cout << "dgG = " << dgG << endl;
+	cout << "nb = " << nb << endl;
+	cout << "phi1 = " << phi1 << endl;
+	cout << "phi2 = " << phi2 << endl;
 
 	time = clock() - time;
 	int ms = double(time) / CLOCKS_PER_SEC * 1000;
