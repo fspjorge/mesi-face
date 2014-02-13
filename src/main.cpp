@@ -53,7 +53,7 @@ int main() {
 //	imshow("img1_pose", img1);
 
 // 4.F) Illumination Normalization
-//	img1 = face.normalizeIllumination(img1);
+	img1 = face.normalizeIllumination(img1);
 
 //	imshow("img1_ill", img1);
 
@@ -83,6 +83,7 @@ int main() {
 	}
 
 	std::sort(filenames.begin(), filenames.end());
+	double dmax = 0;
 
 	for (unsigned f = 0; f < filenames.size(); f++) {
 
@@ -118,12 +119,16 @@ int main() {
 //		imshow("img2_pose", img2);
 
 // 		4.F) Illumination Normalization
-//		img2 = face.normalizeIllumination(img2);
+		img2 = face.normalizeIllumination(img2);
 //		imshow("img2_illim", img2);
 
 //		double localCorrelation = face.computeLocalCorrelation(img1, img2);
 		double globalCorrelation = face.computeGlobalCorrelation(img1, img2);
 		cout << "global correlation = " << globalCorrelation << endl;
+
+		if((1-globalCorrelation) > dmax)
+			dmax = globalCorrelation;
+//		cout << "dmax = " << dmax << endl;
 
 		correlationsMap.insert(make_pair(globalCorrelation, filenames.at(f)));
 	}
@@ -153,7 +158,7 @@ int main() {
 		// compute the distance between p and gi1 (dg1).
 		if(dg1 == 0)
 		{
-			dg1 = 1 - iter->first;
+			dg1 = face.computeQls(iter->first, dmax);
 		}
 
 		// compute the distance between p and gi2 (dg2).
@@ -167,11 +172,11 @@ int main() {
 		}
 		else if(sub_str.compare(identityStr) != 0 && dg2 == 0)
 		{
-			dg2 = 1 - iter->first;
+			dg2 = face.computeQls(iter->first, dmax);
 		}
-		else
+		else // compute the distance between p and gi|G| (dgG).
 		{
-			dgG = 1 - iter->first; // compute the distance between p and gi|G| (dgG).
+			dgG = face.computeQls(iter->first, dmax);
 		}
 
 		/**
@@ -180,14 +185,29 @@ int main() {
 		 * from the returned identity, giving a distance lower than twice
 		 * F(d(p, gi 1)), and the cardinality G of the gallery.
 		 */
-		if(1 - iter->first < 2*dg1)
+		if(face.computeQls(iter->first, dmax) < 2 * dg1)
 		{
-			nb++;// = 1 - iter->first; // Nb = {gi k ∈ G|F (d(p, gi k )) < 2F (d(p, gi 1 ))}.
+			nb++;// Nb = {gi k ∈ G|F (d(p, gi k )) < 2F (d(p, gi 1 ))}.
 		}
 	}
 
 	double phi1 = (dg2 - dg1) / dgG;
 	double phi2 = 1 - (nb / correlationsMap.size());
+
+	/**
+	 * Width of the subinterval from φj to the proper extreme of
+	 * the overall [0, 1),interval of possible values, depending on the
+	 * comparison between the current φj (p) and φj .
+	 */
+	double phij_ = 0.1;
+	double s1 = (phi1 > phij_) ? 1 - phij_ : phij_;
+	double s2 = (phi2 > phij_) ? 1 - phij_ : phij_;
+
+	// srr1 corresponds to the genuine element.
+	double srr1 = abs(phi1 - phij_) / s1;
+
+	// srr2 corresponds to the closest element to the genuine.
+	double srr2 = abs(phi2 - phij_) / s2;
 
 	cout << "dg1 = " << dg1 << endl;
 	cout << "dg2 = " << dg2 << endl;
@@ -195,6 +215,9 @@ int main() {
 	cout << "nb = " << nb << endl;
 	cout << "phi1 = " << phi1 << endl;
 	cout << "phi2 = " << phi2 << endl;
+	cout << "srr1 = " << srr1 << endl;
+	cout << "srr2 = " << srr2 << endl;
+
 
 	time = clock() - time;
 	int ms = double(time) / CLOCKS_PER_SEC * 1000;
