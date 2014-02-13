@@ -379,13 +379,18 @@ double Face::computeGlobalCorrelation(Mat regionA, Mat regionB) {
 	return sum / count;
 }
 
-
-double computeRelativeDistance(Mat p)
+/**
+ *
+ */
+double Face::computeQls(double x, double xmax)
 {
+	double distance = 1 - x;
+	double a = 2 + sqrt(3);
+	double b = 7 - (4*sqrt(3));
 
+	double qls = (1 - b * (distance/xmax)) / (a * b * (distance / xmax) + 1);
 
-
-	return 0.0;
+	return qls;
 }
 
 /**

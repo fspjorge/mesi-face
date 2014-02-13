@@ -76,6 +76,8 @@ public:
 			Point CNoseTip, Point CNoseBase, Point CTipOfChin);
 	Mat normalizeIllumination(Mat face);
 	double computeRelativeDistance(Mat p);
+	double computeQls(double x, double xmax);
+
 };
 
 #endif /* FACE_H_ */
