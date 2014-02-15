@@ -50,12 +50,8 @@ int main() {
 	img1 = face.normalizePose(img1, lPupil, rPupil, lEyebrowInner, noseTip,
 			noseBase, tipOfChin);
 
-//	imshow("img1_pose", img1);
-
-// 4.F) Illumination Normalization
+	// 4.F) Illumination Normalization
 	img1 = face.normalizeIllumination(img1);
-
-//	imshow("img1_ill", img1);
 
 	/**
 	 * Iterate trough all the gallery templates.
@@ -85,9 +81,9 @@ int main() {
 	std::sort(filenames.begin(), filenames.end());
 	double dmax = 0;
 
+	// Gallery comparison
 	for (unsigned f = 0; f < filenames.size(); f++) {
 
-		// FACE 2
 		string root = "/home/jorge/workspace/dissertacao/templates/";
 		string imgPath2 = filenames.at(f).c_str();
 		string absPath = root + imgPath2;
@@ -116,19 +112,14 @@ int main() {
 		img2 = face.normalizePose(img2, lPupil2, rPupil2, lEyebrowInner2,
 				noseTip2, noseBase2, tipOfChin2);
 
-//		imshow("img2_pose", img2);
-
-// 		4.F) Illumination Normalization
+		// 4.F) Illumination Normalization
 		img2 = face.normalizeIllumination(img2);
-//		imshow("img2_illim", img2);
 
-//		double localCorrelation = face.computeLocalCorrelation(img1, img2);
 		double globalCorrelation = face.computeGlobalCorrelation(img1, img2);
 		cout << "global correlation = " << globalCorrelation << endl;
 
 		if((1-globalCorrelation) > dmax)
 			dmax = globalCorrelation;
-//		cout << "dmax = " << dmax << endl;
 
 		correlationsMap.insert(make_pair(globalCorrelation, filenames.at(f)));
 	}
@@ -156,10 +147,7 @@ int main() {
 		cout << iter->second << endl;
 
 		// compute the distance between p and gi1 (dg1).
-		if(dg1 == 0)
-		{
-			dg1 = face.computeQls(iter->first, dmax);
-		}
+		dg1 = (dg1 == 0) ? face.computeQls(iter->first, dmax) : dg1;
 
 		// compute the distance between p and gi2 (dg2).
 		string str = iter->second;
@@ -203,10 +191,19 @@ int main() {
 	double s1 = (phi1 > phij_) ? 1 - phij_ : phij_;
 	double s2 = (phi2 > phij_) ? 1 - phij_ : phij_;
 
-	// srr1 corresponds to the genuine element.
+	/*
+	 * SRR I corresponds to the genuine element.
+	 * SRR I is computed starting from the relative distance (computed starting
+	 * from the distance between the scores of the first two retrieved
+	 * distinct identities)
+	 */
 	double srr1 = abs(phi1 - phij_) / s1;
 
-	// srr2 corresponds to the closest element to the genuine.
+	/*
+	 * SRR II corresponds to the element closest to the genuine one.
+	 * SRR II uses the density ratio (relative amount of gallery templates which are “near” to the
+	 * retrieved identity although belonging to different identities).
+	 */
 	double srr2 = abs(phi2 - phij_) / s2;
 
 	cout << "dg1 = " << dg1 << endl;
