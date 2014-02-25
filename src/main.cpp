@@ -51,7 +51,7 @@ int main() {
 			noseBase, tipOfChin);
 
 	// 4.F) Illumination Normalization
-	img1 = face.normalizeIllumination(img1);
+//	img1 = face.normalizeIllumination(img1);
 
 	/**
 	 * Iterate trough all the gallery templates.
@@ -113,7 +113,7 @@ int main() {
 				noseTip2, noseBase2, tipOfChin2);
 
 		// 4.F) Illumination Normalization
-		img2 = face.normalizeIllumination(img2);
+//		img2 = face.normalizeIllumination(img2);
 
 		double globalCorrelation = face.computeGlobalCorrelation(img1, img2);
 		cout << "global correlation = " << globalCorrelation << endl;
@@ -173,11 +173,16 @@ int main() {
 		 * from the returned identity, giving a distance lower than twice
 		 * F(d(p, gi 1)), and the cardinality G of the gallery.
 		 */
-		if(face.computeQls(iter->first, dmax) < 2 * dg1)
+		if(face.computeQls(iter->first, dmax) < (2 * dg1))
 		{
 			nb++;// Nb = {gi k ∈ G|F (d(p, gi k )) < 2F (d(p, gi 1 ))}.
 		}
 	}
+
+	cout << "dg1 = " << dg1 << endl;
+	cout << "dg2 = " << dg2 << endl;
+	cout << "dgG = " << dgG << endl;
+	cout << "dmax = " << dmax << endl;
 
 	double phi1 = (dg2 - dg1) / dgG;
 	double phi2 = 1 - (nb / correlationsMap.size());
