@@ -384,11 +384,9 @@ double Face::computeGlobalCorrelation(Mat regionA, Mat regionB) {
  */
 double Face::computeQls(double x, double xmax)
 {
-	double distance = 1 - x;
 	double a = 2 + sqrt(3);
-	double b = 7 - (4*sqrt(3));
-
-	double qls = (1 - b * (distance/xmax)) / (a * b * (distance / xmax) + 1);
+	double b = 7 - (4 * sqrt(3));
+	double qls = (1 - b * (x/xmax)) / (a * b * (x / xmax) + 1);
 
 	return qls;
 }
@@ -588,6 +586,10 @@ Point Face::rotatePoint(Point pt, double angle) {
 	return pt;
 }
 
+/**
+ * Function to convert color image to a gray scale image
+ * Input: IplImage* - input color imageData Output: IplImage* - the gray scale image
+ */
 IplImage * Face::Rgb2Gray(IplImage * src) {
 	IplImage *result;
 	int i, j;
@@ -620,6 +622,10 @@ IplImage * Face::Rgb2Gray(IplImage * src) {
 	return result;
 }
 
+/**
+ * This function is used to convert IplImage datatype to a CvMat datatype.
+ * Input: IplImage* - Input image(grey scale) Output: CvMat*- The converted matrix.
+ */
 CvMat * Face::IplImage2Mat(IplImage * inp_img) {
 
 	CvMat *result;
@@ -641,6 +647,10 @@ CvMat * Face::IplImage2Mat(IplImage * inp_img) {
 	return result;
 }
 
+/**
+ * This function is used to convert a matrix into a image.
+ * Input: CvMat* - the input matrix that needs to be converted. int - This is used to specify the type of output image(eg:IPL_DEPTH_32F or IPL_DEPTH_8U) Output: IplImage* - The converted image.
+ */
 IplImage* Face::Mat2IplImage(CvMat *inp_mat, int type) {
 
 	IplImage *result;
@@ -668,6 +678,11 @@ IplImage* Face::Mat2IplImage(CvMat *inp_mat, int type) {
 	return result;
 }
 
+/**
+ * This function is used to scale a input matrix Input: CvMat* - The input matrix,
+ * that needs to be scaled(the same matrix is scaled) double - The maximum range(eg:255)
+ * Return : int - 1 is returned when everything works fine.
+ */
 int Face::Scale_Mat(CvMat *input, double scale) {
 	double tmp;
 	double val;
@@ -715,6 +730,11 @@ int Face::Scale_Mat(CvMat *input, double scale) {
 	return 1;
 }
 
+/**
+ * This function is used to compute weighted gaussian kernel matrix
+ * Input: CvMat* - A small portion of the image where weighted gaussian needs to be applied. * The size of this portion should be same as the Gaussian filter. CvMat* - The gaussian filter.
+ * Output: CvMat* - The weighted gaussian kernel filter
+ */
 CvMat * Face::Weighted_Gaussian(CvMat * inp, CvMat * gaussian) {
 	double sum;
 	double threshold;
@@ -783,6 +803,10 @@ CvMat * Face::Weighted_Gaussian(CvMat * inp, CvMat * gaussian) {
 	return w_gauss;
 }
 
+/**
+ * This function is used to extract a small region within an image.
+ * Input: CvPoint - Specifying the starting point. int- width, int - height, IplImage* - The input image. Output: CvMat* - The extracted portion.
+ */
 CvMat* Face::Get_Mat(CvPoint a, int width, int height, IplImage *image) {
 
 	CvMat *fea_ar;
@@ -833,7 +857,9 @@ CvMat* Face::Get_Mat(CvPoint a, int width, int height, IplImage *image) {
 }
 
 /**
- *
+ * This function is used for applying wighted gaussian filter over an image.
+ * This Input: IplImage* - The input image. The image should be a grey scale image. CvMat* - The gaussian kernel matrix.
+ * Output: CvMat* -The result after applying the kernel on the input image. Size of this is same as that of the input image.
  */
 CvMat * Face::Conv_Weighted_Gaussian(IplImage * inp_img, CvMat * kernel) {
 //IplImage *result;
@@ -876,6 +902,10 @@ CvMat * Face::Conv_Weighted_Gaussian(IplImage * inp_img, CvMat * kernel) {
 
 }
 
+/**
+ * 	This function returns a gaussian kernel matrix of prescribed size.
+ * 	Input: int -- The size of the gaussian kernel Output: CvMat* -- The Gaussian kernel matrix.
+ */
 CvMat* Face::Gaussian(int size) {
 	CvMat *res;
 	int i, j;
@@ -900,6 +930,10 @@ CvMat* Face::Gaussian(int size) {
 	return res;
 }
 
+/**
+ * "This function computes SQI(self quotient image) of an input image. Input: IplImage* - input image Output: IplImage* - the SQI of the input image".
+ * From http://libface.sourceforge.net/libface-0.1-html/d8/d92/libface_8h.html.
+ */
 IplImage * Face::SQI(IplImage * inp) {
 	int num_filters;
 	int size[3];
