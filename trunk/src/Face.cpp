@@ -341,7 +341,7 @@ double Face::computeLocalCorrelation(Mat image1, Mat image2) {
 }
 
 /**
- * .
+ *
  */
 double Face::computeGlobalCorrelation(Mat regionA, Mat regionB) {
 	double sum = 0.0;
@@ -380,13 +380,16 @@ double Face::computeGlobalCorrelation(Mat regionA, Mat regionB) {
 }
 
 /**
- *
+ * Quasi-Linear Sigmoid (QLS) for data normalization.
  */
 double Face::computeQls(double x, double xmax)
 {
+	double distance = 1 - x;
+	xmax = 1 - xmax;
 	double a = 2 + sqrt(3);
 	double b = 7 - (4 * sqrt(3));
-	double qls = (1 - b * (x/xmax)) / (a * b * (x / xmax) + 1);
+
+	double qls = (1 - pow(b, distance/xmax)) / (a * pow(b, distance / xmax) + 1);
 
 	return qls;
 }
