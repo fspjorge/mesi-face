@@ -19,7 +19,7 @@ int main() {
 	clock_t time = clock();
 
 	//FACE 1
-	static const char* imgPath = "2014-01-29-222427.jpg";
+	static const char* imgPath = "2013-11-18-172954.jpg";
 	Face face = Face(imgPath);
 	Mat img1 = face.loadMat();
 	vector<Point> stasmPtsVector = face.getStasmPts();
@@ -51,7 +51,7 @@ int main() {
 			noseBase, tipOfChin);
 
 	// 4.F) Illumination Normalization
-//	img1 = face.normalizeIllumination(img1);
+	img1 = face.normalizeIllumination(img1);
 
 	/**
 	 * Iterate trough all the gallery templates.
@@ -113,7 +113,7 @@ int main() {
 				noseTip2, noseBase2, tipOfChin2);
 
 		// 4.F) Illumination Normalization
-//		img2 = face.normalizeIllumination(img2);
+		img2 = face.normalizeIllumination(img2);
 
 		double globalCorrelation = face.computeGlobalCorrelation(img1, img2);
 		cout << "global correlation = " << globalCorrelation << endl;
@@ -121,7 +121,7 @@ int main() {
 		if((1-globalCorrelation) > dmax)
 			dmax = globalCorrelation;
 
-		correlationsMap.insert(make_pair(globalCorrelation, filenames.at(f)));
+		correlationsMap.insert(make_pair(1 - globalCorrelation, filenames.at(f)));
 	}
 
 	/*
