@@ -19,7 +19,7 @@ int main() {
 	clock_t time = clock();
 
 	//FACE 1
-	static const char* imgPath = "2013-11-18-172954.jpg";
+	static const char* imgPath = "ng1367186.jpg";
 	Face face = Face(imgPath);
 	Mat img1 = face.loadMat();
 	vector<Point> stasmPtsVector = face.getStasmPts();
@@ -192,7 +192,7 @@ int main() {
 	 * the overall [0, 1),interval of possible values, depending on the
 	 * comparison between the current φj (p) and φj .
 	 */
-	double phij_ = 0.1;
+	double phij_ = 0.1; // COMO NO EXEMPLO DO ARTIGO, SERÁ NECESSÁRIO ENCONTRAR UM VALOR?
 	double s1 = (phi1 > phij_) ? 1 - phij_ : phij_;
 	double s2 = (phi2 > phij_) ? 1 - phij_ : phij_;
 
@@ -201,24 +201,78 @@ int main() {
 	 * SRR I is computed starting from the relative distance (computed starting
 	 * from the distance between the scores of the first two retrieved
 	 * distinct identities)
+	 *
+	 * Primeiro medimos a distância absoluta entre φj(p) e o ponto “crítico”.
+	 * Esta distância obtém valores mais altos para φj(p) e
+	 * muito mais mais altos/baixos que φj (genuíno/impostor respetivamente).
 	 */
-	double srr1 = abs(phi1 - phij_) / s1;
+	double dist1 = abs(phi1 - phij_);
+	double srr1 = dist1 / s1;
 
 	/*
 	 * SRR II corresponds to the element closest to the genuine one.
 	 * SRR II uses the density ratio (relative amount of gallery templates which are “near” to the
 	 * retrieved identity although belonging to different identities).
+	 *
+	 * Primeiro medimos a distância absoluta entre φj(p) e o ponto “crítico”.
+	 * Esta distância obtém valores mais altos para φj(p) e
+	 * muito mais mais altos/baixos que φj (genuíno/impostor respetivamente).
 	 */
-	double srr2 = abs(phi2 - phij_) / s2;
+	double dist2 = abs(phi2 - phij_);
+	double srr2 = dist2 / s2;
+
+	// SÓ UTILIZAR UM SRR!
+
 
 	cout << "dg1 = " << dg1 << endl;
 	cout << "dg2 = " << dg2 << endl;
 	cout << "dgG = " << dgG << endl;
 	cout << "nb = " << nb << endl;
-	cout << "phi1 = " << phi1 << endl;
-	cout << "phi2 = " << phi2 << endl;
+	cout << "φ1 = " << phi1 << endl;
+	cout << "φ2 = " << phi2 << endl;
+	cout << "dist1 = " << dist1 << endl;
+	cout << "dist2 = " << dist2 << endl;
 	cout << "srr1 = " << srr1 << endl;
 	cout << "srr2 = " << srr2 << endl;
+
+	// se φ1 < φj_ é aceite
+//	if(phi1 < phij_)
+//	{
+//		cout << "φ1 < φj_ => authentication accepted" << endl;
+//	}
+//	else
+//	{
+//		cout << "φ1 >= φj_ => authentication rejected" << endl;
+//	}
+
+	 //optou-se por usar SRR II
+	// se φ2 < φj_ é aceite
+	if(phi2 < phij_)
+	{
+		cout << "φ2 < φj_ => é aceite" << endl;
+	}
+	else
+	{
+		cout << "φ2 >= φj_ => é rejeitado" << endl;
+	}
+
+	/**
+	 * Treino do Threshold
+	 * Um sistema Tk é executado M vezes produzindo os resultados {T1k (1),..., TMk (1)} com as
+	 * respectivas medidas de fiabilidade (SRR).
+	 * Os valores obtidos são guardados no conjunto BHk = {SRR1k,...,SRRMk}.
+	 */
+	// TODO: testar todas as imagens e guardar o valor dos respectivos SRR de forma a calcular thk
+
+	// calcular correlação
+	double bhk_ = 0.0;
+
+
+	// calcular variância
+	double bhk_var = 0.0;
+
+	// fórmula de thk
+	double thk = abs(pow(bhk_, 2.0) - bhk_var) / bhk_;
 
 
 	time = clock() - time;

@@ -28,6 +28,9 @@
 #include <errno.h>
 #include <ctime>
 #include <unistd.h>
+#include "boost/filesystem/operations.hpp"
+#include "boost/filesystem/path.hpp"
+#include "boost/progress.hpp"
 
 using namespace cv;
 using namespace std;
@@ -77,7 +80,7 @@ public:
 	Mat normalizeIllumination(Mat face);
 	double computeRelativeDistance(Mat p);
 	double computeQls(double x, double xmax);
-
+	double computeSRR(string imgPath, string modelsFolder);
 };
 
 #endif /* FACE_H_ */
