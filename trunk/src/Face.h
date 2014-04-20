@@ -80,7 +80,7 @@ public:
 	Mat normalizeIllumination(Mat face);
 	double computeRelativeDistance(Mat p);
 	double computeQls(double x, double xmax);
-	double computeSRR(string imgPath, string modelsFolder);
+	double train(char* path);
 };
 
 #endif /* FACE_H_ */
