@@ -590,7 +590,7 @@ Point Face::rotatePoint(Point pt, double angle) {
  * Assume that all the images in the folder are models and are recorded in the system.
  * Training system to determine the threshold with current medelos.
  */
-double train(char* path) {
+double Face::train(char* path) {
 
 	vector<string> filenames;
 	vector<double> bhk;
@@ -628,7 +628,6 @@ double train(char* path) {
 	double dmax = 0;
 
 	// Gallery comparison
-	// Gallery comparison
 	for (unsigned f = 0; f < filenames.size(); f++) {
 
 		Mat img1 = face.loadMat();
@@ -664,7 +663,7 @@ double train(char* path) {
 
 		for (unsigned f = 0; f < filenames.size(); f++) {
 
-			string root = "/home/jorge/workspace/dissertacao/templates/";
+			string root = path;
 			string imgPath2 = filenames.at(f).c_str();
 			string absPath = root + imgPath2;
 			face = Face(absPath.c_str());
@@ -815,8 +814,14 @@ double train(char* path) {
 	}
 
 	// calcular thk e devolver o valor do linear!
+	// ver http://www.softwareandfinance.com/CPP/Covariance_Correlation.html
 
-	return 0.0;
+	double correlation = 0.0;
+	double variance = computeStdDev(bhk.data());
+
+	double threshold = abs(pow(correlation, 2.0) - variance);
+
+	return threshold;
 }
 
 /**
@@ -1247,5 +1252,7 @@ IplImage * Face::SQI(IplImage * inp) {
 
 	return res_img;
 }
+
+
 
 #endif /* FACE_CPP_ */
