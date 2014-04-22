@@ -64,7 +64,8 @@ private:
 	Point calcMidpoint(double x1, double y1, double x2, double y2);
 	vector<Point> getStasmPts(char* imgPath, int shape);
 public:
-	Face(const char* imgPath);
+	Face();
+	void init(const char* imgPath);
 	const Mat_<unsigned char>& loadMat() const {
 		return face;
 	}
