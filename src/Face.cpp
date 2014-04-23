@@ -404,8 +404,9 @@ double Face::train(char* path) {
 	vector<double> bhk;
 
 	/**
-	 * Iterate trough all the gallery templates and search for .jpg and .pgm files.
-	 * File names are stored.
+	 * Iterate trough all the gallery templates and search for .jpg and .pgm files, in order
+	 * to obtain the list of elements of the database.
+	 * File names are stored in filenames vector.
 	 */
 	namespace fs = boost::filesystem;
 	fs::path someDir(path);
@@ -437,190 +438,197 @@ double Face::train(char* path) {
 	string imgPath;
 	string absPath;
 
-	// Gallery comparison: Every file is compared to all the files in the gallery.
-	for (unsigned i = 0; i < filenames.size(); i++) {
+	if (!filenames.empty()) {
 
-		root = path;
-		imgPath = filenames.at(i).c_str();
-		absPath = root + imgPath;
-		Mat candidate = loadMat();
-		vector<Point> stasmPtsVector = getStasmPts();
-		map<double, string> correlationsMap;
-
-		Point lPupil = stasmPtsVector.at(31);
-		Point rPupil = stasmPtsVector.at(36);
-		Point noseTip = stasmPtsVector.at(67);
-		Point lEyebrowInner = stasmPtsVector.at(24);
-		Point noseBase = stasmPtsVector.at(41);
-		Point tipOfChin = stasmPtsVector.at(7);
-
-		cout << "Candidate | ";
-
-		// Compute SP and SI
-		double sp = computeSp(lPupil, rPupil, lEyebrowInner, noseTip,
-				noseBase, tipOfChin);
-		cout << "SP = " << sp << " | ";
-		double si = computeSi(lPupil, rPupil, lEyebrowInner, noseTip,
-				noseBase, tipOfChin);
-		cout << "SI = " << si << " | ";
-		cout << path << endl
-				<< "-----------------------------------------------------------------------------------------------------------------"
-				<< endl;
-
-		// 4. A), B), C), D) and E) Pose Normalization
-		candidate = normalizePose(candidate, lPupil, rPupil, lEyebrowInner, noseTip,
-				noseBase, tipOfChin);
-
-		// 4.F) Illumination Normalization
-		candidate = normalizeIllumination(candidate);
-
-		for (unsigned f = 0; f < filenames.size(); f++) {
+		// Gallery comparison: Every file is compared to all the files in the gallery.
+		for (unsigned i = 0; i < filenames.size(); i++) {
 
 			root = path;
-			imgPath = filenames.at(f).c_str();
+			imgPath = filenames.at(i).c_str();
 			absPath = root + imgPath;
 			init(absPath.c_str());
-			Mat model = loadMat();
-			vector<Point> stasmPtsVector2 = getStasmPts();
+			Mat candidate = loadMat();
+			vector<Point> stasmPtsVector = getStasmPts();
+			map<double, string> correlationsMap;
 
-			Point lPupil2 = stasmPtsVector2.at(31);
-			Point rPupil2 = stasmPtsVector2.at(36);
-			Point noseTip2 = stasmPtsVector2.at(67);
-			Point lEyebrowInner2 = stasmPtsVector2.at(24);
-			Point noseBase2 = stasmPtsVector2.at(41);
-			Point tipOfChin2 = stasmPtsVector2.at(7);
+			Point lPupil = stasmPtsVector.at(31);
+			Point rPupil = stasmPtsVector.at(36);
+			Point noseTip = stasmPtsVector.at(67);
+			Point lEyebrowInner = stasmPtsVector.at(24);
+			Point noseBase = stasmPtsVector.at(41);
+			Point tipOfChin = stasmPtsVector.at(7);
 
-			cout << filenames.at(f) << " | ";
+			cout << "Candidate | ";
 
 			// Compute SP and SI
-			double sp2 = computeSp(lPupil2, rPupil2, lEyebrowInner2,
-					noseTip2, noseBase2, tipOfChin2);
-			cout << "SP = " << sp2 << " | ";
-			double si2 = computeSi(lPupil2, rPupil2, lEyebrowInner2,
-					noseTip2, noseBase2, tipOfChin2);
-			cout << "SI = " << si2 << " | ";
+			double sp = computeSp(lPupil, rPupil, lEyebrowInner, noseTip,
+					noseBase, tipOfChin);
+			cout << "SP = " << sp << " | ";
+			double si = computeSi(lPupil, rPupil, lEyebrowInner, noseTip,
+					noseBase, tipOfChin);
+			cout << "SI = " << si << " | ";
+			cout << path << endl
+					<< "-----------------------------------------------------------------------------------------------------------------"
+					<< endl;
 
 			// 4. A), B), C), D) and E) Pose Normalization
-			model = normalizePose(model, lPupil2, rPupil2, lEyebrowInner2,
-					noseTip2, noseBase2, tipOfChin2);
+			candidate = normalizePose(candidate, lPupil, rPupil, lEyebrowInner,
+					noseTip, noseBase, tipOfChin);
 
 			// 4.F) Illumination Normalization
-			model = normalizeIllumination(model);
+			candidate = normalizeIllumination(candidate);
 
-			double globalCorrelation = computeGlobalCorrelation(candidate,
-					model);
-			cout << "global correlation = " << globalCorrelation << endl;
+			for (unsigned f = 0; f < filenames.size(); f++) {
 
-			if ((1 - globalCorrelation) > dmax)
-				dmax = globalCorrelation;
+				root = path;
+				imgPath = filenames.at(f).c_str();
+				absPath = root + imgPath;
+				init(absPath.c_str());
+				Mat model = loadMat();
+				vector<Point> stasmPtsVector2 = getStasmPts();
 
-			correlationsMap.insert(
-					make_pair(1 - globalCorrelation, filenames.at(f)));
-		}
+				Point lPupil2 = stasmPtsVector2.at(31);
+				Point rPupil2 = stasmPtsVector2.at(36);
+				Point noseTip2 = stasmPtsVector2.at(67);
+				Point lEyebrowInner2 = stasmPtsVector2.at(24);
+				Point noseBase2 = stasmPtsVector2.at(41);
+				Point tipOfChin2 = stasmPtsVector2.at(7);
 
-		/*
-		 * The list of computed values is organized in decreasing order.
-		 * Given the mean number n of templates per identity which are contained in the gallery,
-		 * the identity Ij with the maximum number of images in the first
-		 * n positions is returned. As a matter of fact, in an ideal situation,
-		 * all of the templates for the correct identity should appear in the
-		 * first positions of the ordered list.
-		 */
-		double dg1 = 0;
-		double dg2 = 0;
-		double nb = 0;
-		double dgG = 0;
-		string sub_str;
-		size_t index;
-		string identityStr;
+				cout << filenames.at(f) << " | ";
 
-		for (map<double, string>::reverse_iterator iter =
-				correlationsMap.rbegin(); iter != correlationsMap.rend();
-				++iter) {
-			cout << iter->first << ": ";
-			cout << iter->second << endl;
+				// Compute SP and SI
+				double sp2 = computeSp(lPupil2, rPupil2, lEyebrowInner2,
+						noseTip2, noseBase2, tipOfChin2);
+				cout << "SP = " << sp2 << " | ";
+				double si2 = computeSi(lPupil2, rPupil2, lEyebrowInner2,
+						noseTip2, noseBase2, tipOfChin2);
+				cout << "SI = " << si2 << " | ";
 
-			// compute the distance between p and gi1 (dg1).
-			dg1 = (dg1 == 0) ? computeQls(iter->first, dmax) : dg1;
+				// 4. A), B), C), D) and E) Pose Normalization
+				model = normalizePose(model, lPupil2, rPupil2, lEyebrowInner2,
+						noseTip2, noseBase2, tipOfChin2);
 
-			// compute the distance between p and gi2 (dg2).
-			string str = iter->second;
-			index = str.find("_");
-			sub_str = str.substr(0, index);
+				// 4.F) Illumination Normalization
+				model = normalizeIllumination(model);
 
-			if (identityStr.empty()) {
-				identityStr = sub_str;
-			} else if (sub_str.compare(identityStr) != 0 && dg2 == 0) {
-				dg2 = computeQls(iter->first, dmax);
-			} else // compute the distance between p and gi|G| (dgG).
-			{
-				dgG = computeQls(iter->first, dmax);
+				double globalCorrelation = computeGlobalCorrelation(candidate,
+						model);
+				cout << "global correlation = " << globalCorrelation << endl;
+
+				if ((1 - globalCorrelation) > dmax)
+					dmax = globalCorrelation;
+
+				correlationsMap.insert(
+						make_pair(1 - globalCorrelation, filenames.at(f)));
 			}
+
+			/*
+			 * The list of computed values is organized in decreasing order.
+			 * Given the mean number n of templates per identity which are contained in the gallery,
+			 * the identity Ij with the maximum number of images in the first
+			 * n positions is returned. As a matter of fact, in an ideal situation,
+			 * all of the templates for the correct identity should appear in the
+			 * first positions of the ordered list.
+			 */
+			double dg1 = 0;
+			double dg2 = 0;
+			double nb = 0;
+			double dgG = 0;
+			string sub_str;
+			size_t index;
+			string identityStr;
+
+			for (map<double, string>::reverse_iterator iter =
+					correlationsMap.rbegin(); iter != correlationsMap.rend();
+					++iter) {
+				cout << iter->first << ": ";
+				cout << iter->second << endl;
+
+				// compute the distance between p and gi1 (dg1).
+				dg1 = (dg1 == 0) ? computeQls(iter->first, dmax) : dg1;
+
+				// compute the distance between p and gi2 (dg2).
+				string str = iter->second;
+				index = str.find("_");
+				sub_str = str.substr(0, index);
+
+				if (identityStr.empty()) {
+					identityStr = sub_str;
+				} else if (sub_str.compare(identityStr) != 0 && dg2 == 0) {
+					dg2 = computeQls(iter->first, dmax);
+				} else // compute the distance between p and gi|G| (dgG).
+				{
+					dgG = computeQls(iter->first, dmax);
+				}
+
+				/**
+				 * The second function φ2 (p) (density ratio) is computed using
+				 * the ratio between the number of subjects in the gallery, distinct
+				 * from the returned identity, giving a distance lower than twice
+				 * F(d(p, gi 1)), and the cardinality G of the gallery.
+				 */
+				if (computeQls(iter->first, dmax) < (2 * dg1)) {
+					nb++; // Nb = {gi k ∈ G|F (d(p, gi k )) < 2F (d(p, gi 1 ))}.
+				}
+			}
+
+			cout << "dg1 = " << dg1 << endl;
+			cout << "dg2 = " << dg2 << endl;
+			cout << "dgG = " << dgG << endl;
+			cout << "dmax = " << dmax << endl;
+
+			double phi1 = (dg2 - dg1) / dgG;
+			double phi2 = 1 - (nb / correlationsMap.size());
 
 			/**
-			 * The second function φ2 (p) (density ratio) is computed using
-			 * the ratio between the number of subjects in the gallery, distinct
-			 * from the returned identity, giving a distance lower than twice
-			 * F(d(p, gi 1)), and the cardinality G of the gallery.
+			 * Width of the subinterval from φj to the proper extreme of
+			 * the overall [0, 1),interval of possible values, depending on the
+			 * comparison between the current φj (p) and φj .
 			 */
-			if (computeQls(iter->first, dmax) < (2 * dg1)) {
-				nb++; // Nb = {gi k ∈ G|F (d(p, gi k )) < 2F (d(p, gi 1 ))}.
-			}
+			double phij_ = 0.1; // COMO NO EXEMPLO DO ARTIGO, SERÁ NECESSÁRIO ENCONTRAR UM VALOR?
+			double s1 = (phi1 > phij_) ? 1 - phij_ : phij_;
+			double s2 = (phi2 > phij_) ? 1 - phij_ : phij_;
+
+			/*
+			 * SRR I corresponds to the genuine element.
+			 * SRR I is computed starting from the relative distance (computed starting
+			 * from the distance between the scores of the first two retrieved
+			 * distinct identities)
+			 *
+			 * Primeiro medimos a distância absoluta entre φj(p) e o ponto “crítico”.
+			 * Esta distância obtém valores mais altos para φj(p) e
+			 * muito mais mais altos/baixos que φj (genuíno/impostor respetivamente).
+			 */
+			double dist1 = abs(phi1 - phij_);
+			double srr1 = dist1 / s1;
+
+			/*
+			 * SRR II corresponds to the element closest to the genuine one.
+			 * SRR II uses the density ratio (relative amount of gallery templates which are “near” to the
+			 * retrieved identity although belonging to different identities).
+			 *
+			 * Primeiro medimos a distância absoluta entre φj(p) e o ponto “crítico”.
+			 * Esta distância obtém valores mais altos para φj(p) e
+			 * muito mais mais altos/baixos que φj (genuíno/impostor respetivamente).
+			 */
+			double dist2 = abs(phi2 - phij_);
+			double srr2 = dist2 / s2;
+
+			bhk.push_back(srr2);
 		}
-
-		cout << "dg1 = " << dg1 << endl;
-		cout << "dg2 = " << dg2 << endl;
-		cout << "dgG = " << dgG << endl;
-		cout << "dmax = " << dmax << endl;
-
-		double phi1 = (dg2 - dg1) / dgG;
-		double phi2 = 1 - (nb / correlationsMap.size());
-
-		/**
-		 * Width of the subinterval from φj to the proper extreme of
-		 * the overall [0, 1),interval of possible values, depending on the
-		 * comparison between the current φj (p) and φj .
-		 */
-		double phij_ = 0.1; // COMO NO EXEMPLO DO ARTIGO, SERÁ NECESSÁRIO ENCONTRAR UM VALOR?
-		double s1 = (phi1 > phij_) ? 1 - phij_ : phij_;
-		double s2 = (phi2 > phij_) ? 1 - phij_ : phij_;
-
-		/*
-		 * SRR I corresponds to the genuine element.
-		 * SRR I is computed starting from the relative distance (computed starting
-		 * from the distance between the scores of the first two retrieved
-		 * distinct identities)
-		 *
-		 * Primeiro medimos a distância absoluta entre φj(p) e o ponto “crítico”.
-		 * Esta distância obtém valores mais altos para φj(p) e
-		 * muito mais mais altos/baixos que φj (genuíno/impostor respetivamente).
-		 */
-		double dist1 = abs(phi1 - phij_);
-		double srr1 = dist1 / s1;
-
-		/*
-		 * SRR II corresponds to the element closest to the genuine one.
-		 * SRR II uses the density ratio (relative amount of gallery templates which are “near” to the
-		 * retrieved identity although belonging to different identities).
-		 *
-		 * Primeiro medimos a distância absoluta entre φj(p) e o ponto “crítico”.
-		 * Esta distância obtém valores mais altos para φj(p) e
-		 * muito mais mais altos/baixos que φj (genuíno/impostor respetivamente).
-		 */
-		double dist2 = abs(phi2 - phij_);
-		double srr2 = dist2 / s2;
-
-		bhk.push_back(srr2);
 	}
 
 	// calcular thk e devolver o valor do linear!
 	// ver http://www.softwareandfinance.com/CPP/Covariance_Correlation.html
 
-	double mean = computeMean(bhk.data());
-	double stdDev = computeStdDev(bhk.data());
+	if (!bhk.empty() && !bhk.empty())
+	{
+		double srrMean = computeMean(bhk.data());
+		double srrStdDev = computeStdDev(bhk.data());
 
-	// thk = média^2 - desvio padrão / média
-	double threshold = abs(pow(mean, 2.0) - stdDev) / mean;
+		// thk = média^2 - desvio padrão / média
+		double threshold = abs(pow(srrMean, 2.0) - srrStdDev) / srrMean;
+	}
 
 	return 0.0;
 }

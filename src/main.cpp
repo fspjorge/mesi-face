@@ -19,7 +19,7 @@ int main() {
 	clock_t time = clock();
 
 	Face face = Face();
-	char* path = "/home/jorge/workspace/dissertacao/templates";
+	char path[] = "/home/jorge/workspace/dissertacao/templates/";
 	face.train(path);
 
 	time = clock() - time;
