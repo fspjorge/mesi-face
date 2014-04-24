@@ -458,7 +458,7 @@ double Face::train(char* path) {
 			Point noseBase = stasmPtsVector.at(41);
 			Point tipOfChin = stasmPtsVector.at(7);
 
-			cout << "Candidate | ";
+			cout << endl << "Candidate " << filenames.at(i) << " | ";
 
 			// Compute SP and SI
 			double sp = computeSp(lPupil, rPupil, lEyebrowInner, noseTip,
@@ -476,7 +476,7 @@ double Face::train(char* path) {
 					noseTip, noseBase, tipOfChin);
 
 			// 4.F) Illumination Normalization
-			candidate = normalizeIllumination(candidate);
+//			candidate = normalizeIllumination(candidate);
 
 			for (unsigned f = 0; f < filenames.size(); f++) {
 
@@ -509,7 +509,7 @@ double Face::train(char* path) {
 						noseTip2, noseBase2, tipOfChin2);
 
 				// 4.F) Illumination Normalization
-				model = normalizeIllumination(model);
+//				model = normalizeIllumination(model);
 
 				double globalCorrelation = computeGlobalCorrelation(candidate,
 						model);
@@ -530,10 +530,10 @@ double Face::train(char* path) {
 			 * all of the templates for the correct identity should appear in the
 			 * first positions of the ordered list.
 			 */
-			double dg1 = 0;
-			double dg2 = 0;
-			double nb = 0;
-			double dgG = 0;
+			double dg1 			= 0.0;
+			double dg2 			= 0.0;
+			double nb 			= 0.0;
+			double dgG 			= 0.0;
 			string sub_str;
 			size_t index;
 			string identityStr;
@@ -611,26 +611,39 @@ double Face::train(char* path) {
 			 * Esta distância obtém valores mais altos para φj(p) e
 			 * muito mais mais altos/baixos que φj (genuíno/impostor respetivamente).
 			 */
-			double dist2 = abs(phi2 - phij_);
-			double srr2 = dist2 / s2;
+			double dist2 	= abs(phi2 - phij_);
+			double srr2 	= dist2 / s2;
 
-			bhk.push_back(srr2);
+	        cout << "srr1 = " << srr1 << endl;
+	        cout << "srr2 = " << srr2 << endl;
+
+			bhk.push_back(srr1);
 		}
 	}
 
 	// calcular thk e devolver o valor do linear!
 	// ver http://www.softwareandfinance.com/CPP/Covariance_Correlation.html
+	double srrMean 		= 0.0;
+	double srrStdDev 	= 0.0;
+	double linear 		= 0.0;
 
 	if (!bhk.empty() && !bhk.empty())
 	{
-		double srrMean = computeMean(bhk.data());
-		double srrStdDev = computeStdDev(bhk.data());
+		srrMean 		= computeMean	(&bhk[0]);
+		srrStdDev 		= computeStdDev	(&bhk[0]);
 
 		// thk = média^2 - desvio padrão / média
-		double threshold = abs(pow(srrMean, 2.0) - srrStdDev) / srrMean;
+		linear 		= abs(pow(srrMean, 2.0) - srrStdDev) / srrMean;
+
+		cout << " threshold = " << linear << endl;
+	}
+	else
+	{
+		cout << " Valores de SRR não encontrados, não foi possível determinar o linear!" << endl;
+		return 0.0;
 	}
 
-	return 0.0;
+	return linear;
 }
 
 /**
