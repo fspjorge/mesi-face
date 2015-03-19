@@ -1,0 +1,1 @@
+Este trabalho tem como objectivo o estudo da autenticação/autorização biométrica por meio de reconhecimento de faces. Na dissertação inclui-se a realização de um sistema programado em Java/Scala para computadores do género desktop e para dispositivos móveis com o sistema operativo Android.
