@@ -25,7 +25,7 @@ add_executable(face_gui WIN32
 target_include_directories(face_cli PRIVATE src)
 target_include_directories(face_gui PRIVATE src)
 target_link_libraries(face_cli PRIVATE ${OpenCV_LIBS})
-target_link_libraries(face_gui PRIVATE ${OpenCV_LIBS} comdlg32 shell32 ole32)
+target_link_libraries(face_gui PRIVATE ${OpenCV_LIBS} comdlg32 comctl32 shell32 ole32)
 
 if(MINGW)
   target_compile_options(face_cli PRIVATE -Wall -Wextra -Wpedantic)

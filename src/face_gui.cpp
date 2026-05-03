@@ -6,8 +6,10 @@
 
 #include <filesystem>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <iomanip>
 
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
@@ -29,11 +31,17 @@ constexpr int kIdOriginalImage = 1008;
 constexpr int kIdPoseImage = 1009;
 constexpr int kIdOpenOutput = 1010;
 constexpr int kIdSqiImage = 1011;
+constexpr int kIdProgressBar = 1012;
+constexpr int kIdStatusText = 1013;
 
 struct GuiState {
+    HWND mainWindow = nullptr;
     HWND galleryEdit = nullptr;
     HWND imageEdit = nullptr;
     HWND illuminationCheck = nullptr;
+    HWND runButton = nullptr;
+    HWND progressBar = nullptr;
+    HWND statusText = nullptr;
     HWND resultText = nullptr;
     HWND originalImage = nullptr;
     HWND poseImage = nullptr;
@@ -148,6 +156,22 @@ void showError(HWND owner, const string& message) {
     MessageBoxW(owner, toWide(message).c_str(), L"FACE GUI Error", MB_ICONERROR | MB_OK);
 }
 
+void pumpUiMessages() {
+    MSG message{};
+    while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
+    }
+}
+
+void setProgress(GuiState& state, int percent, const wchar_t* status) {
+    SendMessageW(state.progressBar, PBM_SETPOS, percent, 0);
+    SetWindowTextW(state.statusText, status);
+    UpdateWindow(state.progressBar);
+    UpdateWindow(state.statusText);
+    pumpUiMessages();
+}
+
 string buildGuiSummary(const IdentificationResult& result) {
     const MatchScore& top = result.ranking.front();
     std::ostringstream stream;
@@ -170,14 +194,21 @@ void runIdentify(GuiState& state) {
     const fs::path imagePath = toUtf8(getWindowTextString(state.imageEdit));
     const bool illumination = SendMessageW(state.illuminationCheck, BM_GETCHECK, 0, 0) == BST_CHECKED;
 
+    EnableWindow(state.runButton, FALSE);
+    setProgress(state, 5, L"Initializing pipeline...");
     FacePipeline pipeline("data", state.outputDir, illumination, "_");
+    setProgress(state, 25, L"Loading gallery...");
     const vector<ProcessedFace> gallery = loadGallery(pipeline, galleryDir);
+    setProgress(state, 55, L"Processing query image...");
     const ProcessedFace query = pipeline.processImage(imagePath);
+    setProgress(state, 75, L"Matching against gallery...");
     const FaceMatcher matcher;
     const IdentificationResult result = matcher.identify(query, gallery);
+    setProgress(state, 90, L"Rendering results...");
 
     const cv::Mat original = cv::imread(imagePath.string(), cv::IMREAD_COLOR);
     if (original.empty()) {
+        EnableWindow(state.runButton, TRUE);
         throw runtime_error("Cannot reload original image for display");
     }
 
@@ -185,6 +216,8 @@ void runIdentify(GuiState& state) {
     setBitmapOnControl(state.originalImage, state.originalBitmap, matToBitmap(original));
     setBitmapOnControl(state.poseImage, state.poseBitmap, matToBitmap(query.poseNormalized));
     setBitmapOnControl(state.sqiImage, state.sqiBitmap, matToBitmap(query.illuminationNormalized));
+    setProgress(state, 100, L"Done.");
+    EnableWindow(state.runButton, TRUE);
 }
 
 LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -218,6 +251,8 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             try {
                 runIdentify(*state);
             } catch (const exception& ex) {
+                EnableWindow(state->runButton, TRUE);
+                setProgress(*state, 0, L"Processing failed.");
                 showError(hwnd, ex.what());
             }
             return 0;
@@ -247,6 +282,9 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 }
 
 void createControls(HWND hwnd, GuiState& state) {
+    state.mainWindow = hwnd;
+    InitCommonControls();
+
     CreateWindowW(L"STATIC", L"Gallery:", WS_VISIBLE | WS_CHILD, 24, 22, 80, 24, hwnd, nullptr, nullptr, nullptr);
     state.galleryEdit = CreateWindowW(L"EDIT", L"data",
                                       WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL,
@@ -255,7 +293,7 @@ void createControls(HWND hwnd, GuiState& state) {
                   WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
                   646, 18, 110, 26, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdGalleryBrowse)), nullptr, nullptr);
 
-    CreateWindowW(L"STATIC", L"Query Image:", WS_VISIBLE | WS_CHILD, 24, 60, 80, 24, hwnd, nullptr, nullptr, nullptr);
+    CreateWindowW(L"STATIC", L"Query Image:", WS_VISIBLE | WS_CHILD, 24, 60, 92, 24, hwnd, nullptr, nullptr, nullptr);
     state.imageEdit = CreateWindowW(L"EDIT", L"testface.jpg",
                                     WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL,
                                     110, 56, 520, 26, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdImageEdit)), nullptr, nullptr);
@@ -268,12 +306,20 @@ void createControls(HWND hwnd, GuiState& state) {
                                             24, 98, 260, 24, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdIllumination)), nullptr, nullptr);
     SendMessageW(state.illuminationCheck, BM_SETCHECK, BST_CHECKED, 0);
 
-    CreateWindowW(L"BUTTON", L"Run Identify",
-                  WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-                  320, 92, 140, 32, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdRun)), nullptr, nullptr);
+    state.runButton = CreateWindowW(L"BUTTON", L"Run Identify",
+                                    WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                                    320, 92, 140, 32, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdRun)), nullptr, nullptr);
     CreateWindowW(L"BUTTON", L"Open Output Folder",
                   WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
                   474, 92, 170, 32, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdOpenOutput)), nullptr, nullptr);
+    state.progressBar = CreateWindowW(PROGRESS_CLASSW, nullptr,
+                                      WS_VISIBLE | WS_CHILD | PBS_SMOOTH,
+                                      672, 94, 300, 22, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdProgressBar)), nullptr, nullptr);
+    SendMessageW(state.progressBar, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
+    SendMessageW(state.progressBar, PBM_SETPOS, 0, 0);
+    state.statusText = CreateWindowW(L"STATIC", L"Idle",
+                                     WS_VISIBLE | WS_CHILD,
+                                     996, 94, 180, 22, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdStatusText)), nullptr, nullptr);
 
     CreateWindowW(L"STATIC", L"Original", WS_VISIBLE | WS_CHILD, 24, 152, 120, 24, hwnd, nullptr, nullptr, nullptr);
     state.originalImage = CreateWindowW(L"STATIC", nullptr,
