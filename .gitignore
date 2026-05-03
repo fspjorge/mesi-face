@@ -1,5 +1,8 @@
 build/
 output*/
+.docx_extract_*/
+.docx_extract_*.zip
+empty_gallery/
 *.user
 *.VC.db
 *.opendb

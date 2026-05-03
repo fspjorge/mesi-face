@@ -163,3 +163,69 @@ Se o objetivo for aproximar ainda mais a implementação ao artigo original, os 
 Este projeto representa uma parte importante do trabalho desenvolvido na minha tese de mestrado.  
 Mais do que uma simples aplicação, é também um registo do processo de investigação, implementação e interpretação prática de um artigo científico na área de biometria e reconhecimento facial.
 
+## Parte Experimental da Tese
+
+Na parte experimental do trabalho, o objetivo foi avaliar diferentes aspetos do método `FACE` em ambientes pouco controlados, com especial atenção ao impacto de:
+
+- pose
+- iluminação
+- resolução da imagem
+- precisão da localização de landmarks
+- fiabilidade da resposta final
+
+### Bases de Dados Consideradas
+
+Foram consideradas quatro bases de dados principais:
+
+- `CDB`: conjunto de celebridades com imagens de diferentes qualidades e resoluções
+- `LFW`: imagens em condições não controladas, com forte variabilidade de pose, expressão e iluminação
+- `SCFace`: imagens capturadas por câmaras de vigilância em ambientes interiores não controlados
+- `FERET`: usada como referência mais controlada, com subconjuntos frontais, de iluminação e de pose
+
+No caso da `FERET`, o trabalho focou sobretudo os subconjuntos:
+
+- `fa`: faces frontais com variações de expressão
+- `fc`: faces frontais com variações de luminosidade
+- `qr`: variações de pose com rotação à direita
+
+### Desenho Experimental
+
+Os ensaios foram organizados em várias fases:
+
+1. comparação do módulo de correlação local de `FACE` com outros métodos clássicos, como `SVM`, `ISVM`, `PCA`, `ILDA` e `ICA`
+2. avaliação do contributo do módulo de normalização proposto
+3. estudo do impacto da precisão da localização de pontos por `STASM`
+4. análise da relação entre má localização de landmarks e degradação da normalização facial
+5. integração das medidas `SP`, `SI`, `SRR I` e `SRR II` para filtragem de amostras e respostas
+
+### Principais Observações
+
+Os resultados experimentais mostraram que:
+
+- o módulo de correlação local de `FACE` é competitivo face aos métodos clássicos usados na comparação
+- a normalização proposta melhora o desempenho, sobretudo em bases de dados mais difíceis e menos controladas
+- a resolução da imagem influencia fortemente a qualidade da localização dos pontos faciais
+- a precisão do `STASM` é crítica, especialmente para a ponta do nariz, cuja má localização pode introduzir aberrações relevantes na normalização
+- `FACE` mantém desempenho interessante mesmo com poucas imagens por identidade, como no cenário `CDB (3 img)`
+- os índices de qualidade e fiabilidade permitem aumentar a precisão final do sistema à custa de rejeitar amostras ou respostas menos confiáveis
+
+### Leituras Relevantes da Parte Experimental
+
+Do ponto de vista da tese, a componente experimental deixou claros alguns pontos importantes:
+
+- `FERET fa` funciona como cenário mais controlado e, por isso, tende a apresentar melhores resultados
+- `LFW` e `CDB` são mais exigentes, sobretudo devido à menor resolução e maior variabilidade de captura
+- `SCFace` foi particularmente útil para estudar os efeitos de pose e os limites do `STASM`
+- a combinação de índices de qualidade (`SP`, `SI`) e fiabilidade (`SRR I`, `SRR II`) fornece um mecanismo prático para reforçar a robustez da decisão
+
+### Relação com o Estado Atual do Repositório
+
+O estado atual deste repositório preserva a estrutura conceptual usada na tese:
+
+- análise da qualidade da amostra
+- normalização de pose
+- normalização de iluminação
+- matching por correlação local
+- avaliação da confiabilidade da resposta
+
+No entanto, esta base ainda deve ser entendida como uma continuação moderna e executável do trabalho, e não como a reprodução final e fechada de todos os testes experimentais descritos na dissertação.
