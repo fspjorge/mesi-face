@@ -1,0 +1,14 @@
+build/
+output*/
+*.user
+*.VC.db
+*.opendb
+*.sdf
+*.ipch
+*.obj
+*.pdb
+*.ilk
+*.tlog
+*.lastbuildstate
+*.recipe
+*.cache

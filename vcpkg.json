@@ -1,0 +1,12 @@
+{
+  "name": "face-cli",
+  "version-string": "0.1.0",
+  "description": "Windows-first CLI implementation of the FACE pipeline for robust face recognition.",
+  "builtin-baseline": "e5a1490e1409d175932ef6014519e9ae149ddb7c",
+  "dependencies": [
+    {
+      "name": "opencv",
+      "default-features": false
+    }
+  ]
+}

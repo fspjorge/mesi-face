@@ -1,0 +1,53 @@
+{
+  "version": "0.2.1",
+  "defaults": {},
+  "configurations": [
+    {
+      "type": "default",
+      "projectTarget": "face_cli.exe",
+      "name": "face_cli identify",
+      "args": [
+        "identify",
+        "--gallery-dir", "data",
+        "--query-image", "testface.jpg",
+        "--cascade-dir", "data",
+        "--output-dir", "output-vs-debug"
+      ],
+      "cwd": "${workspaceRoot}",
+      "env": {
+        "PATH": "${workspaceRoot}\\build\\vs2026-msvc\\vcpkg_installed\\x64-windows\\bin;${env.PATH}"
+      }
+    },
+    {
+      "type": "default",
+      "projectTarget": "face_cli.exe",
+      "name": "face_cli train",
+      "args": [
+        "train",
+        "--gallery-dir", "data",
+        "--cascade-dir", "data",
+        "--output-dir", "output-vs-debug"
+      ],
+      "cwd": "${workspaceRoot}",
+      "env": {
+        "PATH": "${workspaceRoot}\\build\\vs2026-msvc\\vcpkg_installed\\x64-windows\\bin;${env.PATH}"
+      }
+    },
+    {
+      "type": "default",
+      "projectTarget": "face_cli.exe",
+      "name": "face_cli batch",
+      "args": [
+        "batch",
+        "--gallery-dir", "data",
+        "--query-dir", "data",
+        "--cascade-dir", "data",
+        "--output-dir", "output-vs-debug"
+      ],
+      "cwd": "${workspaceRoot}",
+      "env": {
+        "PATH": "${workspaceRoot}\\build\\vs2026-msvc\\vcpkg_installed\\x64-windows\\bin;${env.PATH}"
+      }
+    }
+  ]
+}
