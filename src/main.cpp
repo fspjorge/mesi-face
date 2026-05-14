@@ -11,12 +11,16 @@ using namespace std;
 namespace fs = std::filesystem;
 
 namespace {
+fs::path defaultStasmDataDir() {
+    return fs::path("third_party") / "stasm" / "data";
+}
+
 struct CliOptions {
     string mode;
     fs::path galleryDir;
     fs::path queryDir;
     fs::path queryImage;
-    fs::path cascadeDir = "data";
+    fs::path cascadeDir = defaultStasmDataDir();
     fs::path outputDir = "output";
     string identityDelimiter = "_";
     bool illuminationNormalization = true;
@@ -25,9 +29,9 @@ struct CliOptions {
 void printUsage() {
     cout
         << "Usage:\n"
-        << "  face_cli train --gallery-dir <dir> [--cascade-dir <dir>] [--output-dir <dir>]\n"
-        << "  face_cli identify --gallery-dir <dir> --query-image <file> [--cascade-dir <dir>] [--output-dir <dir>]\n"
-        << "  face_cli batch --gallery-dir <dir> --query-dir <dir> [--cascade-dir <dir>] [--output-dir <dir>]\n"
+        << "  face_cli train --gallery-dir <dir> [--cascade-dir <dir>|--model-dir <dir>] [--output-dir <dir>]\n"
+        << "  face_cli identify --gallery-dir <dir> --query-image <file> [--cascade-dir <dir>|--model-dir <dir>] [--output-dir <dir>]\n"
+        << "  face_cli batch --gallery-dir <dir> --query-dir <dir> [--cascade-dir <dir>|--model-dir <dir>] [--output-dir <dir>]\n"
         << "Options:\n"
         << "  --illumination on|off\n"
         << "  --identity-delimiter <text>\n";
@@ -39,7 +43,7 @@ CliOptions parseArgs(int argc, char** argv) {
         options.mode = "identify";
         options.galleryDir = "data";
         options.queryImage = "testface.jpg";
-        options.cascadeDir = "data";
+        options.cascadeDir = defaultStasmDataDir();
         options.outputDir = "output-vs-debug";
         return options;
     }
@@ -70,6 +74,9 @@ CliOptions parseArgs(int argc, char** argv) {
     }
     if (args.count("--cascade-dir")) {
         options.cascadeDir = args["--cascade-dir"];
+    }
+    if (args.count("--model-dir")) {
+        options.cascadeDir = args["--model-dir"];
     }
     if (args.count("--output-dir")) {
         options.outputDir = args["--output-dir"];

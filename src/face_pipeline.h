@@ -6,16 +6,22 @@
 #include <vector>
 
 #include <opencv2/core.hpp>
-#include <opencv2/objdetect.hpp>
 
 struct FaceLandmarks {
     cv::Rect faceBox;
     cv::Point2f leftEye;
     cv::Point2f rightEye;
+    cv::Point2f leftBrowOuter;
+    cv::Point2f rightBrowOuter;
     cv::Point2f eyebrowInner;
     cv::Point2f noseTip;
     cv::Point2f noseBase;
+    cv::Point2f mouthTop;
+    cv::Point2f mouthBottom;
+    cv::Point2f mouthLeftCorner;
+    cv::Point2f mouthRightCorner;
     cv::Point2f chinTip;
+    std::vector<cv::Point2f> stasmShape;
 };
 
 struct ProcessedFace {
@@ -42,18 +48,13 @@ public:
     const std::filesystem::path& outputDir() const noexcept;
 
 private:
-    mutable cv::CascadeClassifier faceCascade_;
-    mutable cv::CascadeClassifier leftEyeCascade_;
-    mutable cv::CascadeClassifier rightEyeCascade_;
+    std::filesystem::path stasmDataDir_;
     std::filesystem::path outputDir_;
     bool illuminationNormalization_ = true;
     std::string identityDelimiter_;
 
     static std::string identityFromPath(const std::filesystem::path& path, const std::string& delimiter);
-    static cv::Rect chooseLargest(const std::vector<cv::Rect>& boxes);
     static cv::Rect clampRect(const cv::Rect& rect, const cv::Size& bounds);
-    static cv::Point2f rectCenter(const cv::Rect& rect);
-    static std::optional<cv::Rect> detectSingle(cv::CascadeClassifier& cascade, const cv::Mat& gray, const cv::Rect& roi);
     static cv::Point2f rotatePoint(const cv::Point2f& point, const cv::Point2f& center, double angleDegrees);
     static double computePointsAngle(const cv::Point2f& pt1, const cv::Point2f& pt2);
     static cv::Mat correctBandPerspective(const cv::Mat& src, const cv::Point2f& pt1, const cv::Point2f& pt2, const cv::Point2f& pt3);

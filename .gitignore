@@ -1,5 +1,7 @@
 build/
 output*/
+.stasm_src/
+stasm4.1.0.tar.gz
 .docx_extract_*/
 .docx_extract_*.zip
 empty_gallery/

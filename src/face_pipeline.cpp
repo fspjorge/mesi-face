@@ -8,6 +8,9 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "stasm_lib.h"
+#include "stasm_landmarks.h"
+
 using namespace std;
 namespace fs = std::filesystem;
 
@@ -27,30 +30,29 @@ vector<cv::Point2f*> landmarkRefs(FaceLandmarks& landmarks) {
     return {
         &landmarks.leftEye,
         &landmarks.rightEye,
+        &landmarks.leftBrowOuter,
+        &landmarks.rightBrowOuter,
         &landmarks.eyebrowInner,
         &landmarks.noseTip,
         &landmarks.noseBase,
+        &landmarks.mouthTop,
+        &landmarks.mouthBottom,
+        &landmarks.mouthLeftCorner,
+        &landmarks.mouthRightCorner,
         &landmarks.chinTip,
     };
 }
 
 vector<cv::Point2f> illuminationAnchors(const FaceLandmarks& landmarks) {
-    const cv::Point2f leftCheek = midpoint(
-        cv::Point2f(static_cast<float>(landmarks.faceBox.x), landmarks.leftEye.y),
-        landmarks.leftEye);
-    const cv::Point2f rightCheek = midpoint(
-        landmarks.rightEye,
-        cv::Point2f(static_cast<float>(landmarks.faceBox.x + landmarks.faceBox.width), landmarks.rightEye.y));
-
     return {
-        midpoint(leftCheek, landmarks.leftEye),
-        midpoint(landmarks.leftEye, landmarks.eyebrowInner),
+        midpoint(landmarks.stasmShape.at(0), landmarks.stasmShape.at(39)),
+        midpoint(landmarks.stasmShape.at(3), landmarks.stasmShape.at(39)),
         landmarks.eyebrowInner,
         midpoint(landmarks.eyebrowInner, landmarks.noseTip),
         landmarks.noseTip,
         landmarks.chinTip,
-        midpoint(landmarks.rightEye, landmarks.noseBase),
-        midpoint(rightCheek, landmarks.rightEye),
+        midpoint(landmarks.stasmShape.at(14), landmarks.stasmShape.at(43)),
+        midpoint(landmarks.stasmShape.at(10), landmarks.stasmShape.at(43)),
     };
 }
 }
@@ -59,21 +61,21 @@ FacePipeline::FacePipeline(fs::path cascadeDir,
                            fs::path outputDir,
                            bool illuminationNormalization,
                            string identityDelimiter)
-    : outputDir_(std::move(outputDir)),
+    : stasmDataDir_(std::move(cascadeDir)),
+      outputDir_(std::move(outputDir)),
       illuminationNormalization_(illuminationNormalization),
       identityDelimiter_(std::move(identityDelimiter)) {
-    const auto faceCascadePath = cascadeDir / "haarcascade_frontalface_alt2.xml";
-    const auto leftEyeCascadePath = cascadeDir / "haarcascade_mcs_lefteye.xml";
-    const auto rightEyeCascadePath = cascadeDir / "haarcascade_mcs_righteye.xml";
-
-    if (!faceCascade_.load(faceCascadePath.string())) {
-        throw runtime_error("Unable to load face cascade: " + faceCascadePath.string());
+    if (!fs::exists(stasmDataDir_ / "haarcascade_frontalface_alt2.xml")) {
+        throw runtime_error("STASM data directory is missing haarcascade_frontalface_alt2.xml: " + stasmDataDir_.string());
     }
-    if (!leftEyeCascade_.load(leftEyeCascadePath.string())) {
-        throw runtime_error("Unable to load left eye cascade: " + leftEyeCascadePath.string());
+    if (!fs::exists(stasmDataDir_ / "haarcascade_mcs_lefteye.xml")) {
+        throw runtime_error("STASM data directory is missing haarcascade_mcs_lefteye.xml: " + stasmDataDir_.string());
     }
-    if (!rightEyeCascade_.load(rightEyeCascadePath.string())) {
-        throw runtime_error("Unable to load right eye cascade: " + rightEyeCascadePath.string());
+    if (!fs::exists(stasmDataDir_ / "haarcascade_mcs_righteye.xml")) {
+        throw runtime_error("STASM data directory is missing haarcascade_mcs_righteye.xml: " + stasmDataDir_.string());
+    }
+    if (!stasm_init(stasmDataDir_.string().c_str(), 0)) {
+        throw runtime_error("stasm_init failed: " + string(stasm_lasterr()));
     }
 
     fs::create_directories(outputDir_ / "normalized");
@@ -119,22 +121,12 @@ string FacePipeline::identityFromPath(const fs::path& path, const string& delimi
     return pos == string::npos ? stem : stem.substr(0, pos);
 }
 
-cv::Rect FacePipeline::chooseLargest(const vector<cv::Rect>& boxes) {
-    return *max_element(boxes.begin(), boxes.end(), [](const cv::Rect& lhs, const cv::Rect& rhs) {
-        return lhs.area() < rhs.area();
-    });
-}
-
 cv::Rect FacePipeline::clampRect(const cv::Rect& rect, const cv::Size& bounds) {
     const int x = max(0, rect.x);
     const int y = max(0, rect.y);
     const int maxWidth = max(0, bounds.width - x);
     const int maxHeight = max(0, bounds.height - y);
     return cv::Rect(x, y, min(rect.width, maxWidth), min(rect.height, maxHeight));
-}
-
-cv::Point2f FacePipeline::rectCenter(const cv::Rect& rect) {
-    return cv::Point2f(rect.x + rect.width * 0.5f, rect.y + rect.height * 0.5f);
 }
 
 cv::Point2f FacePipeline::rotatePoint(const cv::Point2f& point, const cv::Point2f& center, double angleDegrees) {
@@ -235,58 +227,63 @@ double FacePipeline::computeSigmoid(double value) {
     return 1.0 / (1.0 + exp(-value / 160.0));
 }
 
-optional<cv::Rect> FacePipeline::detectSingle(cv::CascadeClassifier& cascade, const cv::Mat& gray, const cv::Rect& roi) {
-    const cv::Rect safeRoi = clampRect(roi, gray.size());
-    if (safeRoi.width <= 0 || safeRoi.height <= 0) {
-        return nullopt;
-    }
-
-    vector<cv::Rect> detections;
-    cascade.detectMultiScale(gray(safeRoi), detections, 1.1, 3, cv::CASCADE_SCALE_IMAGE, cv::Size(12, 12));
-    if (detections.empty()) {
-        return nullopt;
-    }
-    cv::Rect best = chooseLargest(detections);
-    best.x += safeRoi.x;
-    best.y += safeRoi.y;
-    return best;
-}
-
 FaceLandmarks FacePipeline::detectLandmarks(const cv::Mat& gray, const fs::path& imagePath) const {
-    vector<cv::Rect> faces;
-    faceCascade_.detectMultiScale(gray, faces, 1.1, 4, cv::CASCADE_SCALE_IMAGE, cv::Size(60, 60));
-    if (faces.empty()) {
+    int foundFace = 0;
+    float landmarksRaw[2 * stasm_NLANDMARKS] = {};
+    if (!stasm_search_single(&foundFace,
+                             landmarksRaw,
+                             reinterpret_cast<const char*>(gray.data),
+                             gray.cols,
+                             gray.rows,
+                             imagePath.string().c_str(),
+                             stasmDataDir_.string().c_str())) {
+        throw runtime_error("stasm_search_single failed for " + imagePath.string() + ": " + string(stasm_lasterr()));
+    }
+    if (!foundFace) {
         throw runtime_error("No face detected in image: " + imagePath.string());
     }
 
+    stasm_force_points_into_image(landmarksRaw, gray.cols, gray.rows);
+    stasm_convert_shape(landmarksRaw, 68);
+
+    constexpr int kConvertedLandmarks = 68;
+    vector<cv::Point2f> shape(kConvertedLandmarks);
+    for (int i = 0; i < kConvertedLandmarks; ++i) {
+        shape[i] = cv::Point2f(landmarksRaw[i * 2], landmarksRaw[i * 2 + 1]);
+    }
+
+    float minX = static_cast<float>(gray.cols - 1);
+    float minY = static_cast<float>(gray.rows - 1);
+    float maxX = 0.0f;
+    float maxY = 0.0f;
+    for (const cv::Point2f& point : shape) {
+        minX = std::min(minX, point.x);
+        minY = std::min(minY, point.y);
+        maxX = std::max(maxX, point.x);
+        maxY = std::max(maxY, point.y);
+    }
+
     FaceLandmarks landmarks;
-    landmarks.faceBox = chooseLargest(faces);
+    landmarks.stasmShape = shape;
+    landmarks.faceBox = clampRect(
+        cv::Rect(static_cast<int>(std::floor(minX)),
+                 static_cast<int>(std::floor(minY)),
+                 std::max(1, static_cast<int>(std::ceil(maxX - minX))),
+                 std::max(1, static_cast<int>(std::ceil(maxY - minY)))),
+        gray.size());
 
-    const cv::Rect leftEyeRoi(landmarks.faceBox.x,
-                              landmarks.faceBox.y + landmarks.faceBox.height / 8,
-                              landmarks.faceBox.width / 2,
-                              landmarks.faceBox.height / 2);
-    const cv::Rect rightEyeRoi(landmarks.faceBox.x + landmarks.faceBox.width / 2,
-                               landmarks.faceBox.y + landmarks.faceBox.height / 8,
-                               landmarks.faceBox.width / 2,
-                               landmarks.faceBox.height / 2);
-
-    auto leftEye = detectSingle(leftEyeCascade_, gray, leftEyeRoi);
-    auto rightEye = detectSingle(rightEyeCascade_, gray, rightEyeRoi);
-
-    landmarks.leftEye = leftEye ? rectCenter(*leftEye)
-                                : cv::Point2f(landmarks.faceBox.x + landmarks.faceBox.width * 0.32f,
-                                              landmarks.faceBox.y + landmarks.faceBox.height * 0.40f);
-    landmarks.rightEye = rightEye ? rectCenter(*rightEye)
-                                  : cv::Point2f(landmarks.faceBox.x + landmarks.faceBox.width * 0.68f,
-                                                landmarks.faceBox.y + landmarks.faceBox.height * 0.40f);
-
-    const cv::Point2f eyesMid = midpoint(landmarks.leftEye, landmarks.rightEye);
-    landmarks.eyebrowInner = cv::Point2f(eyesMid.x - landmarks.faceBox.width * 0.08f,
-                                         eyesMid.y - landmarks.faceBox.height * 0.14f);
-    landmarks.noseTip = cv::Point2f(eyesMid.x, landmarks.faceBox.y + landmarks.faceBox.height * 0.60f);
-    landmarks.noseBase = cv::Point2f(eyesMid.x, landmarks.faceBox.y + landmarks.faceBox.height * 0.72f);
-    landmarks.chinTip = cv::Point2f(eyesMid.x, landmarks.faceBox.y + landmarks.faceBox.height * 0.98f);
+    landmarks.leftEye = shape[31];
+    landmarks.rightEye = shape[36];
+    landmarks.leftBrowOuter = shape[18];
+    landmarks.rightBrowOuter = shape[29];
+    landmarks.eyebrowInner = shape[24];
+    landmarks.noseTip = shape[67];
+    landmarks.noseBase = shape[41];
+    landmarks.mouthTop = shape[51];
+    landmarks.mouthBottom = shape[57];
+    landmarks.mouthLeftCorner = shape[48];
+    landmarks.mouthRightCorner = shape[54];
+    landmarks.chinTip = shape[7];
     return landmarks;
 }
 
@@ -301,6 +298,9 @@ cv::Mat FacePipeline::normalizePose(const cv::Mat& gray, FaceLandmarks& landmark
     for (cv::Point2f* point : landmarkRefs(landmarks)) {
         *point = rotatePoint(*point, imageCenter, -angle);
     }
+    for (cv::Point2f& point : landmarks.stasmShape) {
+        point = rotatePoint(point, imageCenter, -angle);
+    }
 
     const double dl = cv::norm(landmarks.leftEye - landmarks.noseTip);
     const double dr = cv::norm(landmarks.rightEye - landmarks.noseTip);
@@ -309,20 +309,28 @@ cv::Mat FacePipeline::normalizePose(const cv::Mat& gray, FaceLandmarks& landmark
         for (cv::Point2f* point : landmarkRefs(landmarks)) {
             point->x = static_cast<float>(rotated.cols - 1) - point->x;
         }
+        for (cv::Point2f& point : landmarks.stasmShape) {
+            point.x = static_cast<float>(rotated.cols - 1) - point.x;
+        }
         std::swap(landmarks.leftEye, landmarks.rightEye);
+        std::swap(landmarks.leftBrowOuter, landmarks.rightBrowOuter);
+        std::swap(landmarks.mouthLeftCorner, landmarks.mouthRightCorner);
     }
 
-    const float mouthMidY = landmarks.noseBase.y + (landmarks.chinTip.y - landmarks.noseBase.y) * 0.45f;
-    const float mouthHalfWidth = static_cast<float>(cv::norm(landmarks.leftEye - landmarks.rightEye)) * 0.22f;
-    const cv::Point2f lipTop(midpoint(landmarks.leftEye, landmarks.rightEye).x, mouthMidY - 8.0f);
-    const cv::Point2f lipBottom(midpoint(landmarks.leftEye, landmarks.rightEye).x, mouthMidY + 8.0f);
-    const cv::Point2f browOuterLeft(landmarks.leftEye.x - mouthHalfWidth, landmarks.eyebrowInner.y);
-    const cv::Point2f browOuterRight(landmarks.rightEye.x + mouthHalfWidth, landmarks.eyebrowInner.y);
+    const cv::Point2f lipTop = landmarks.mouthTop;
+    const cv::Point2f lipBottom = landmarks.mouthBottom;
 
-    int x1 = static_cast<int>(std::round(std::min(browOuterLeft.x, landmarks.leftEye.x)));
-    int x2 = static_cast<int>(std::round(std::max(browOuterRight.x, landmarks.rightEye.x)));
-    int y1 = static_cast<int>(std::round(landmarks.eyebrowInner.y - 40.0f));
-    int y2 = static_cast<int>(std::round(landmarks.chinTip.y + 5.0f));
+    int x1 = 0;
+    int x2 = 0;
+    if (dl > dr) {
+        x1 = static_cast<int>(std::round(landmarks.stasmShape.at(13).x));
+        x2 = static_cast<int>(std::round(landmarks.stasmShape.at(1).x));
+    } else {
+        x1 = static_cast<int>(std::round(landmarks.stasmShape.at(1).x));
+        x2 = static_cast<int>(std::round(landmarks.stasmShape.at(13).x));
+    }
+    int y1 = static_cast<int>(std::round(landmarks.stasmShape.at(23).y - 40.0f));
+    int y2 = static_cast<int>(std::round(landmarks.stasmShape.at(7).y + 5.0f));
 
     cv::Rect cropRect(x1, y1, std::max(1, x2 - x1), std::max(1, y2 - y1));
     cropRect = clampRect(cropRect, rotated.size());
@@ -336,7 +344,7 @@ cv::Mat FacePipeline::normalizePose(const cv::Mat& gray, FaceLandmarks& landmark
     };
 
     const cv::Point2f noseTip = toCrop(landmarks.noseTip);
-    const cv::Point2f noseTop = toCrop(midpoint(landmarks.eyebrowInner, midpoint(browOuterLeft, browOuterRight)));
+    const cv::Point2f noseTop = toCrop(midpoint(landmarks.stasmShape.at(24), landmarks.stasmShape.at(18)));
     const cv::Point2f topCenter(noseTop.x, 0.0f);
     const cv::Point2f noseBase = toCrop(landmarks.noseBase);
     const cv::Point2f lipTopCrop = toCrop(lipTop);

@@ -34,6 +34,10 @@ constexpr int kIdSqiImage = 1011;
 constexpr int kIdProgressBar = 1012;
 constexpr int kIdStatusText = 1013;
 
+fs::path defaultStasmDataDir() {
+    return fs::path("third_party") / "stasm" / "data";
+}
+
 struct GuiState {
     HWND mainWindow = nullptr;
     HWND galleryEdit = nullptr;
@@ -196,7 +200,7 @@ void runIdentify(GuiState& state) {
 
     EnableWindow(state.runButton, FALSE);
     setProgress(state, 5, L"Initializing pipeline...");
-    FacePipeline pipeline("data", state.outputDir, illumination, "_");
+    FacePipeline pipeline(defaultStasmDataDir(), state.outputDir, illumination, "_");
     setProgress(state, 25, L"Loading gallery...");
     const vector<ProcessedFace> gallery = loadGallery(pipeline, galleryDir);
     setProgress(state, 55, L"Processing query image...");
