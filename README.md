@@ -134,6 +134,7 @@ The GUI allows:
 - toggling illumination normalization
 - visualizing original, pose-normalized, and SQI/matching views
 - reading `SP`, `SI`, `SRR1`, `SRR2` and ranking results
+- running FERET batch experiments directly from the app by selecting the FERET root and subset
 
 ## Generated Outputs
 

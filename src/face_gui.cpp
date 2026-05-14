@@ -33,6 +33,11 @@ constexpr int kIdOpenOutput = 1010;
 constexpr int kIdSqiImage = 1011;
 constexpr int kIdProgressBar = 1012;
 constexpr int kIdStatusText = 1013;
+constexpr int kIdFeretRootEdit = 1014;
+constexpr int kIdFeretRootBrowse = 1015;
+constexpr int kIdFeretSubsetCombo = 1016;
+constexpr int kIdFeretRun = 1017;
+constexpr int kIdFeretSummaryText = 1018;
 
 fs::path defaultStasmDataDir() {
     return fs::path("third_party") / "stasm" / "data";
@@ -50,6 +55,10 @@ struct GuiState {
     HWND originalImage = nullptr;
     HWND poseImage = nullptr;
     HWND sqiImage = nullptr;
+    HWND feretRootEdit = nullptr;
+    HWND feretSubsetCombo = nullptr;
+    HWND feretRunButton = nullptr;
+    HWND feretSummaryText = nullptr;
     HBITMAP originalBitmap = nullptr;
     HBITMAP poseBitmap = nullptr;
     HBITMAP sqiBitmap = nullptr;
@@ -142,10 +151,10 @@ wstring openFileDialog(HWND owner) {
     return L"";
 }
 
-wstring browseFolder(HWND owner) {
+wstring browseFolder(HWND owner, const wchar_t* title) {
     BROWSEINFOW bi{};
     bi.hwndOwner = owner;
-    bi.lpszTitle = L"Select gallery folder";
+    bi.lpszTitle = title;
     PIDLIST_ABSOLUTE pidl = SHBrowseForFolderW(&bi);
     if (!pidl) {
         return L"";
@@ -176,6 +185,20 @@ void setProgress(GuiState& state, int percent, const wchar_t* status) {
     pumpUiMessages();
 }
 
+int selectedComboIndex(HWND combo) {
+    const LRESULT index = SendMessageW(combo, CB_GETCURSEL, 0, 0);
+    return index == CB_ERR ? 0 : static_cast<int>(index);
+}
+
+string feretSubsetName(int index) {
+    switch (index) {
+    case 1: return "fa";
+    case 2: return "fc";
+    case 3: return "qr";
+    default: return "all";
+    }
+}
+
 string buildGuiSummary(const IdentificationResult& result) {
     const MatchScore& top = result.ranking.front();
     std::ostringstream stream;
@@ -191,6 +214,58 @@ string buildGuiSummary(const IdentificationResult& result) {
         stream << match.identity << " | " << match.imagePath.filename().string() << " | " << match.correlation << "\r\n";
     }
     return stream.str();
+}
+
+string buildFeretSummary(const vector<BatchRunSummary>& summaries, const fs::path& rootDir) {
+    ostringstream stream;
+    stream << fixed << setprecision(6);
+    stream << "FERET root: " << rootDir.string() << "\r\n\r\n";
+    for (const BatchRunSummary& summary : summaries) {
+        stream << "[" << summary.label << "]\r\n";
+        stream << "gallery=" << summary.gallerySize << "\r\n";
+        stream << "queries=" << summary.queryCount << "\r\n";
+        stream << "mean_top_correlation=" << summary.meanTopCorrelation << "\r\n";
+        stream << "mean_srr1=" << summary.meanSrr1 << "\r\n";
+        stream << "mean_srr2=" << summary.meanSrr2 << "\r\n";
+        stream << "csv=" << summary.csvPath.string() << "\r\n\r\n";
+    }
+    return stream.str();
+}
+
+void runFeretExperiment(GuiState& state) {
+    const fs::path feretRoot = toUtf8(getWindowTextString(state.feretRootEdit));
+    const bool illumination = SendMessageW(state.illuminationCheck, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    const int subsetIndex = selectedComboIndex(state.feretSubsetCombo);
+
+    if (feretRoot.empty()) {
+        throw runtime_error("FERET root is empty");
+    }
+
+    const vector<string> subsets = subsetIndex == 0
+        ? vector<string>{"fa", "fc", "qr"}
+        : vector<string>{feretSubsetName(subsetIndex)};
+
+    EnableWindow(state.feretRunButton, FALSE);
+    setProgress(state, 5, L"Preparing FERET experiment...");
+
+    vector<BatchRunSummary> summaries;
+    for (size_t i = 0; i < subsets.size(); ++i) {
+        const string& subset = subsets[i];
+        const fs::path subsetRoot = feretRoot / subset;
+        const fs::path galleryDir = subsetRoot / "gallery";
+        const fs::path probeDir = subsetRoot / "probe";
+        const fs::path outputDir = subsetRoot / "output";
+
+        const wstring status = wstring(L"Running subset ") + toWide(subset) + L"...";
+        setProgress(state, 15 + static_cast<int>(i * 25), status.c_str());
+        FacePipeline pipeline(defaultStasmDataDir(), outputDir, illumination, "_");
+        FaceMatcher matcher;
+        summaries.push_back(runBatchExperiment(pipeline, matcher, galleryDir, probeDir, outputDir, subset));
+    }
+
+    setWindowTextUtf8(state.feretSummaryText, buildFeretSummary(summaries, feretRoot));
+    setProgress(state, 100, L"FERET done.");
+    EnableWindow(state.feretRunButton, TRUE);
 }
 
 void runIdentify(GuiState& state) {
@@ -238,7 +313,7 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         switch (LOWORD(wParam)) {
         case kIdGalleryBrowse: {
-            const wstring folder = browseFolder(hwnd);
+            const wstring folder = browseFolder(hwnd, L"Select gallery folder");
             if (!folder.empty()) {
                 SetWindowTextW(state->galleryEdit, folder.c_str());
             }
@@ -262,6 +337,22 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             return 0;
         case kIdOpenOutput:
             ShellExecuteW(hwnd, L"open", toWide(state->outputDir.string()).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            return 0;
+        case kIdFeretRootBrowse: {
+            const wstring folder = browseFolder(hwnd, L"Select FERET root folder");
+            if (!folder.empty()) {
+                SetWindowTextW(state->feretRootEdit, folder.c_str());
+            }
+            return 0;
+        }
+        case kIdFeretRun:
+            try {
+                runFeretExperiment(*state);
+            } catch (const exception& ex) {
+                EnableWindow(state->feretRunButton, TRUE);
+                setProgress(*state, 0, L"FERET failed.");
+                showError(hwnd, ex.what());
+            }
             return 0;
         default:
             return 0;
@@ -344,6 +435,33 @@ void createControls(HWND hwnd, GuiState& state) {
     state.resultText = CreateWindowW(L"EDIT", L"",
                                      WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
                                      996, 180, 320, 340, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdResultText)), nullptr, nullptr);
+
+    CreateWindowW(L"STATIC", L"FERET Root:", WS_VISIBLE | WS_CHILD, 24, 548, 100, 24, hwnd, nullptr, nullptr, nullptr);
+    state.feretRootEdit = CreateWindowW(L"EDIT", L"experiments\\feret",
+                                        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL,
+                                        110, 544, 520, 26, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdFeretRootEdit)), nullptr, nullptr);
+    CreateWindowW(L"BUTTON", L"Browse",
+                  WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                  646, 544, 110, 26, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdFeretRootBrowse)), nullptr, nullptr);
+
+    CreateWindowW(L"STATIC", L"Subset:", WS_VISIBLE | WS_CHILD, 780, 548, 60, 24, hwnd, nullptr, nullptr, nullptr);
+    state.feretSubsetCombo = CreateWindowW(WC_COMBOBOXW, nullptr,
+                                           WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | WS_VSCROLL,
+                                           840, 542, 130, 300, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdFeretSubsetCombo)), nullptr, nullptr);
+    SendMessageW(state.feretSubsetCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"All"));
+    SendMessageW(state.feretSubsetCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"fa"));
+    SendMessageW(state.feretSubsetCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"fc"));
+    SendMessageW(state.feretSubsetCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"qr"));
+    SendMessageW(state.feretSubsetCombo, CB_SETCURSEL, 0, 0);
+
+    state.feretRunButton = CreateWindowW(L"BUTTON", L"Run FERET",
+                                         WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                                         984, 542, 120, 32, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdFeretRun)), nullptr, nullptr);
+
+    CreateWindowW(L"STATIC", L"FERET Summary", WS_VISIBLE | WS_CHILD, 24, 586, 120, 24, hwnd, nullptr, nullptr, nullptr);
+    state.feretSummaryText = CreateWindowW(L"EDIT", L"Run FERET to generate a summary here.",
+                                           WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
+                                           24, 612, 1294, 100, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdFeretSummaryText)), nullptr, nullptr);
 }
 }
 
@@ -365,7 +483,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         className,
         L"FACE GUI",
         WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1370, 610,
+        CW_USEDEFAULT, CW_USEDEFAULT, 1370, 760,
         nullptr, nullptr, instance, &state);
 
     if (!hwnd) {

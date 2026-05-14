@@ -30,11 +30,11 @@ experiments/feret/
 
 ## How To Use
 
-First run [scripts/prepare-feret.ps1](../../scripts/prepare-feret.ps1) to generate `manifest.csv` if it does not exist yet. Fill the manifest with the source files you want copied into each subset.
+You can prepare the folders either from the GUI or from PowerShell.
 
-Then run the same script again to populate the `gallery` and `probe` folders.
+The GUI now supports a FERET panel where you point it at the FERET root folder and choose `All`, `fa`, `fc`, or `qr`.
 
-After that, run the CLI batch mode for each subset.
+If you want to prepare the files manually, use [scripts/prepare-feret.ps1](../../scripts/prepare-feret.ps1) and the manifest template it generates.
 
 Example:
 

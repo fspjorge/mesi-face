@@ -50,6 +50,50 @@ vector<ProcessedFace> loadGallery(const FacePipeline& pipeline, const fs::path& 
     return gallery;
 }
 
+BatchRunSummary runBatchExperiment(const FacePipeline& pipeline,
+                                   const FaceMatcher& matcher,
+                                   const fs::path& galleryDir,
+                                   const fs::path& queryDir,
+                                   const fs::path& outputDir,
+                                   const string& label) {
+    const vector<ProcessedFace> gallery = loadGallery(pipeline, galleryDir);
+    const vector<fs::path> queryFiles = collectImages(queryDir);
+    if (queryFiles.empty()) {
+        throw runtime_error("No query images found in: " + queryDir.string());
+    }
+
+    vector<IdentificationResult> results;
+    results.reserve(queryFiles.size());
+    for (const fs::path& queryFile : queryFiles) {
+        results.push_back(matcher.identify(pipeline.processImage(queryFile), gallery));
+    }
+
+    fs::create_directories(outputDir);
+    const fs::path csvPath = outputDir / "batch_results.csv";
+    writeBatchCsv(csvPath, results);
+
+    BatchRunSummary summary;
+    summary.label = label;
+    summary.csvPath = csvPath;
+    summary.gallerySize = gallery.size();
+    summary.queryCount = results.size();
+    if (!results.empty()) {
+        double sumCorrelation = 0.0;
+        double sumSrr1 = 0.0;
+        double sumSrr2 = 0.0;
+        for (const IdentificationResult& result : results) {
+            sumCorrelation += result.ranking.front().correlation;
+            sumSrr1 += result.reliability.srr1;
+            sumSrr2 += result.reliability.srr2;
+        }
+        const double count = static_cast<double>(results.size());
+        summary.meanTopCorrelation = sumCorrelation / count;
+        summary.meanSrr1 = sumSrr1 / count;
+        summary.meanSrr2 = sumSrr2 / count;
+    }
+    return summary;
+}
+
 string formatIdentificationSummary(const IdentificationResult& result) {
     if (result.ranking.empty()) {
         throw runtime_error("No ranking produced");
