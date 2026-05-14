@@ -63,6 +63,8 @@ Important note:
 |   |-- face_matcher.*        # local/global correlation, SRR
 |   |-- face_gui.cpp          # Win32 GUI
 |   `-- main.cpp              # CLI
+|-- experiments/feret/        # FERET thesis experiment scaffold
+|-- scripts/                  # convenience scripts for batch runs
 |-- third_party/stasm/        # vendored STASM sources, models, cascades, license
 |-- CMakeLists.txt
 |-- CMakePresets.json
@@ -142,6 +144,22 @@ The output directory contains:
 - `normalized/*_sqi.png`
 - `histograms/*`
 - `batch_results.csv`
+
+## FERET Experiment Layout
+
+A dedicated scaffold is provided under [experiments/feret](./experiments/feret/README.md) for the thesis evaluation protocol:
+
+- `fa` for frontal + expression variation
+- `fc` for frontal + illumination variation
+- `qr` for pose variation
+
+Each subset has separate `gallery`, `probe`, and `output` folders so the experiments can be run consistently with the same CLI.
+
+You can run all three subsets with:
+
+```powershell
+.\scripts\run-feret.ps1
+```
 
 ## Experimental Notes From the Thesis
 
