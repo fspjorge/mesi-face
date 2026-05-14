@@ -155,6 +155,14 @@ A dedicated scaffold is provided under [experiments/feret](./experiments/feret/R
 
 Each subset has separate `gallery`, `probe`, and `output` folders so the experiments can be run consistently with the same CLI.
 
+To prepare the directory tree and generate a manifest template, run:
+
+```powershell
+.\scripts\prepare-feret.ps1
+```
+
+Then fill [experiments/feret/manifest.csv](./experiments/feret/manifest.csv) with your file mapping and rerun the same script to copy the images into place.
+
 You can run all three subsets with:
 
 ```powershell

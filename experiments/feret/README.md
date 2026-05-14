@@ -30,11 +30,16 @@ experiments/feret/
 
 ## How To Use
 
-Place the FERET images in the relevant `gallery` and `probe` folders, then run the CLI batch mode for each subset.
+First run [scripts/prepare-feret.ps1](../../scripts/prepare-feret.ps1) to generate `manifest.csv` if it does not exist yet. Fill the manifest with the source files you want copied into each subset.
+
+Then run the same script again to populate the `gallery` and `probe` folders.
+
+After that, run the CLI batch mode for each subset.
 
 Example:
 
 ```powershell
+.\scripts\prepare-feret.ps1
 .\build\vs2026-msvc\Release\face_cli.exe batch --gallery-dir experiments\feret\fa\gallery --query-dir experiments\feret\fa\probe --output-dir experiments\feret\fa\output
 .\build\vs2026-msvc\Release\face_cli.exe batch --gallery-dir experiments\feret\fc\gallery --query-dir experiments\feret\fc\probe --output-dir experiments\feret\fc\output
 .\build\vs2026-msvc\Release\face_cli.exe batch --gallery-dir experiments\feret\qr\gallery --query-dir experiments\feret\qr\probe --output-dir experiments\feret\qr\output

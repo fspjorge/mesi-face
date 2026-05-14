@@ -1,0 +1,7 @@
+Subset,Role,Source,TargetName
+fa,gallery,fa\001_frontal_1.jpg,001_frontal_1.jpg
+fa,probe,fa\001_expression_1.jpg,001_expression_1.jpg
+fc,gallery,fc\001_frontal_1.jpg,001_frontal_1.jpg
+fc,probe,fc\001_illumination_1.jpg,001_illumination_1.jpg
+qr,gallery,qr\001_frontal_1.jpg,001_frontal_1.jpg
+qr,probe,qr\001_pose_right_1.jpg,001_pose_right_1.jpg
